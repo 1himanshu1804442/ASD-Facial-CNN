@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: asd_cnn_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: neurograph_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d neurograph_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  cnn-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: asd_cnn_python_engine
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - TORCH_NUM_THREADS=4
+    volumes:
+      - ./models:/app/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  backend-gateway:
+    build:
+      context: ./backend-spring
+      dockerfile: Dockerfile
+    container_name: asd_spring_gateway
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cnn-engine:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/neurograph_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgrespassword
+      - INFERENCE_ENGINE_URL=http://cnn-engine:8000
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: asd_react_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend-gateway
+    ports:
+      - "5173:80"
+
+volumes:
+  postgres_data:
+    driver: local
