@@ -83,16 +83,21 @@ The project is structured into four decoupled, production-grade microservices:
 
 ## 📊 Empirical Benchmarks & Model Comparison
 
-Both architectures were fine-tuned using transfer learning on the real Zenodo Pediatric Autism Dataset:
+Both architectures were fine-tuned using transfer learning on the real Zenodo Pediatric Autism Dataset and evaluated on the held-out 300 test images:
 
 | Metric | ResNet-50 (Deep High Precision) | MobileNet-V2 (Lightweight Edge Triage) |
 | :--- | :---: | :---: |
 | **Model Type** | Deep Residual Bottleneck CNN | Inverted Residual Depthwise CNN |
 | **Total Parameters** | 23.51 M | 2.23 M |
-| **Trainable Head Params** | 14.97 M | 1.28 M |
-| **Validation Accuracy** | **84.00%** | **81.00%** |
+| **Trainable Head Params** | 14.97 M | 1.21 M |
+| **Test Accuracy (300 Cohort)** | **87.00%** | **86.00%** |
+| **Sensitivity (Recall)** | **86.67%** | **87.33%** |
+| **Specificity** | **87.33%** | **84.67%** |
+| **Precision** | **87.25%** | **85.06%** |
+| **F1-Score** | **0.8696** | **0.8618** |
+| **AUC-ROC** | **0.9310** | **0.9326** |
 | **Inference Latency (CPU)** | ~38 ms | **~14 ms** |
-| **Model Checkpoint Size** | 90.1 MB | **8.9 MB** |
+| **Model Checkpoint Size** | 90.0 MB | **8.7 MB** |
 | **Target Deployment** | Hospital Server / Centralized PACS | Point-of-Care Tablet / Mobile Triage |
 | **Primary Advantage** | Maximum morphological representation | Ultra-fast execution & minimal memory |
 

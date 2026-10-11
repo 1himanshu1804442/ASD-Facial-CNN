@@ -1,0 +1,30 @@
+{
+  "resnet50": {
+    "accuracy": 0.87,
+    "sensitivity": 0.8666666666666667,
+    "specificity": 0.8733333333333333,
+    "precision": 0.87248322147651,
+    "f1_score": 0.8695652173913043,
+    "auc_roc": 0.9309777777777778,
+    "true_positives": 130,
+    "true_negatives": 131,
+    "false_positives": 19,
+    "false_negatives": 20,
+    "loss": 0.426,
+    "samples_evaluated": 300
+  },
+  "mobilenet_v2": {
+    "accuracy": 0.86,
+    "sensitivity": 0.8733333333333333,
+    "specificity": 0.8466666666666667,
+    "precision": 0.8506493506493507,
+    "f1_score": 0.8618421052631579,
+    "auc_roc": 0.9325777777777777,
+    "true_positives": 131,
+    "true_negatives": 127,
+    "false_positives": 23,
+    "false_negatives": 19,
+    "loss": 0.333,
+    "samples_evaluated": 300
+  }
+}
