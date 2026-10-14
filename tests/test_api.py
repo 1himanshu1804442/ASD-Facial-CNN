@@ -57,7 +57,7 @@ def test_predict_image_resnet50():
     assert response.status_code == 200
     data = response.json()
 
-    assert data["predicted_class"] in ["ASD", "Typical"]
+    assert data["predicted_class"] in [1, 0, "ASD", "Typical"]
     assert 0.0 <= data["confidence"] <= 1.0
     assert 0.0 <= data["probability_asd"] <= 1.0
     assert 0.0 <= data["probability_typical"] <= 1.0
@@ -84,7 +84,7 @@ def test_predict_image_mobilenet_v2():
     assert response.status_code == 200
     data = response.json()
 
-    assert data["predicted_class"] in ["ASD", "Typical"]
+    assert data["predicted_class"] in [1, 0, "ASD", "Typical"]
     assert 0.0 <= data["confidence"] <= 1.0
     assert data["model_used"] == "mobilenet_v2"
     assert "inference_time_ms" in data
@@ -100,4 +100,83 @@ def test_predict_image_empty_file():
         files={"file": ("empty.jpg", empty_buf, "image/jpeg")}
     )
     assert response.status_code == 400
+
+
+def test_predict_facial_gcn_endpoint():
+    """Verify facial GCN endpoint returns 68 landmarks and top pathways."""
+    import io
+    from PIL import Image
+
+    img = Image.new("RGB", (224, 224), color=(180, 120, 90))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    buf.seek(0)
+
+    response = client.post(
+        "/api/predict/facial-gcn",
+        files={"file": ("child_face.jpg", buf, "image/jpeg")},
+        data={"subject_id": "TEST_CHILD_001", "age": 7.5}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "connectome_graph" in data or "landmarks" in data
+    nodes = data["connectome_graph"]["nodes"] if "connectome_graph" in data else data["landmarks"]
+    assert len(nodes) == 68
+    assert "top_pathways" in data
+    assert len(data["top_pathways"]) >= 4
+    assert data["predicted_label"] in ["Autism Spectrum Disorder", "Typical Control"]
+
+
+def test_predict_image_rgba_png():
+    """Verify that RGBA images with transparency are cleanly converted and predicted."""
+    import io
+    from PIL import Image
+
+    img = Image.new("RGBA", (300, 300), color=(120, 180, 220, 200))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+
+    response = client.post(
+        "/api/predict/image",
+        files={"file": ("transparent_portrait.png", buf, "image/png")}
+    )
+    assert response.status_code == 200
+    assert response.json()["predicted_class"] in [1, 0, "ASD", "Typical"]
+
+
+def test_predict_image_grayscale():
+    """Verify that grayscale (single-channel L mode) portraits are properly normalized."""
+    import io
+    from PIL import Image
+
+    img = Image.new("L", (256, 256), color=128)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    buf.seek(0)
+
+    response = client.post(
+        "/api/predict/image",
+        files={"file": ("bw_photo.jpg", buf, "image/jpeg")}
+    )
+    assert response.status_code == 200
+    assert response.json()["predicted_class"] in [1, 0, "ASD", "Typical"]
+
+
+def test_predict_image_large_resolution():
+    """Verify that high-resolution phone camera portraits (1920x1080) execute without memory or shape issues."""
+    import io
+    from PIL import Image
+
+    img = Image.new("RGB", (1920, 1080), color=(210, 170, 140))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    buf.seek(0)
+
+    response = client.post(
+        "/api/predict/image",
+        files={"file": ("hd_phone_selfie.jpg", buf, "image/jpeg")}
+    )
+    assert response.status_code == 200
+    assert response.json()["predicted_class"] in [1, 0, "ASD", "Typical"]
 

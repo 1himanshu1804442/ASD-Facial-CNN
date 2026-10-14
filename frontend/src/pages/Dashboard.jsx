@@ -141,7 +141,7 @@ export default function Dashboard() {
               }}
             >
               <Scan size={16} />
-              <span>Facial Image GCN Screening</span>
+              <span>Facial CNN Screening</span>
             </button>
 
             <button

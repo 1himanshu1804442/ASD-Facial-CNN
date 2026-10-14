@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Brain, ShieldCheck, Sparkles, Database, History } from 'lucide-react';
+import { Activity, Scan, ShieldCheck, Sparkles, Database, History } from 'lucide-react';
 
 export default function Header({ isOnline, onOpenHistory, historyCount = 0 }) {
   return (
@@ -29,17 +29,17 @@ export default function Header({ isOnline, onOpenHistory, historyCount = 0 }) {
           justifyContent: 'center',
           boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)'
         }}>
-          <Brain size={24} color="#ffffff" />
+          <Scan size={24} color="#ffffff" />
         </div>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.025em', color: '#ffffff' }}>
-              NeuroGraph<span style={{ color: '#818cf8' }}>-ASD</span>
+              ASD Facial Screening<span style={{ color: '#818cf8' }}> AI</span>
             </h1>
-            <span className="badge badge-primary">v1.0 XAI</span>
+            <span className="badge badge-primary">CNN Vision</span>
           </div>
           <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8' }}>
-            Explainable Graph Attention Network for rs-fMRI Connectome Screening
+            Deep Transfer Learning (ResNet-50 & MobileNet-V2) for Pediatric Facial Triage
           </p>
         </div>
       </div>
@@ -67,7 +67,7 @@ export default function Header({ isOnline, onOpenHistory, historyCount = 0 }) {
           className="glass-panel-hover"
         >
           <History size={15} color="#818cf8" />
-          <span>Patient History / Records</span>
+          <span>Screening Records</span>
           {historyCount > 0 && (
             <span
               style={{
@@ -85,7 +85,7 @@ export default function Header({ isOnline, onOpenHistory, historyCount = 0 }) {
           )}
         </button>
 
-        {/* Backend & GAT Status Pill */}
+        {/* Backend & PyTorch Status Pill */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -102,13 +102,13 @@ export default function Header({ isOnline, onOpenHistory, historyCount = 0 }) {
             backgroundColor: isOnline ? '#10b981' : '#ef4444'
           }} />
           <span style={{ fontSize: '0.8rem', fontWeight: 600, color: isOnline ? '#34d399' : '#f87171' }}>
-            {isOnline ? 'GAT Engine Ready' : 'Connecting to API...'}
+            {isOnline ? 'PyTorch AI Online' : 'Connecting to API...'}
           </span>
         </div>
 
         <div className="badge badge-primary" style={{ display: 'flex', gap: '6px' }}>
           <Sparkles size={14} />
-          <span>AAL-116 Atlas</span>
+          <span>Zenodo Dataset (2,936 Images)</span>
         </div>
       </div>
     </header>

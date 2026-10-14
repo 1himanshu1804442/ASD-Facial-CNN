@@ -307,11 +307,11 @@ export default function FacialGraphCanvas({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#818cf8', letterSpacing: '0.05em' }}>
-            Topological Graph Explainability
+            Biometric Landmark Explainability
           </span>
           <h2 style={{ margin: '4px 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <GitBranch size={22} className="text-indigo-400" />
-            68-Point Facial Landmark & GCN Graph
+            68-Point Facial Landmark Mesh
           </h2>
         </div>
 
@@ -340,7 +340,7 @@ export default function FacialGraphCanvas({
             <span>68 Nodes</span>
           </button>
 
-          {/* GCN Saliency Graph Toggle */}
+          {/* Saliency Contours Graph Toggle */}
           <button
             type="button"
             onClick={() => setShowSaliencyGraph(!showSaliencyGraph)}
@@ -360,7 +360,7 @@ export default function FacialGraphCanvas({
             }}
           >
             <GitBranch size={14} />
-            <span>GCN Edges</span>
+            <span>Feature Contours</span>
           </button>
 
           {/* Edge Saliency Labels Toggle */}

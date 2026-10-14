@@ -172,7 +172,7 @@ export default function ImageUploader({
         </div>
         <div className="badge badge-primary">
           <Sparkles size={12} />
-          <span>CNN + GCN Explainability</span>
+          <span>CNN Feature Explainability</span>
         </div>
       </div>
 

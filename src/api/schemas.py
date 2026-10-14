@@ -60,10 +60,17 @@ class HealthResponse(BaseModel):
 
 
 class ImagePredictionResponse(BaseModel):
-    predicted_class: str = Field(description="'ASD' or 'Typical'")
-    confidence: float = Field(description="Prediction confidence score")
+    predicted_class: Any = Field(description="1 / 'ASD' or 0 / 'Typical'")
+    predicted_label: Optional[str] = Field(default=None, description="'Autism Spectrum Disorder' or 'Typical Control'")
+    confidence: float = Field(description="Prediction confidence score (0.0 to 1.0)")
+    confidence_percentage: Optional[float] = Field(default=None, description="Confidence percentage (0.0 to 100.0)")
+    asd_probability: Optional[float] = Field(default=None, description="Softmax probability for ASD")
+    control_probability: Optional[float] = Field(default=None, description="Softmax probability for Typical")
     probability_asd: float = Field(description="Softmax probability for ASD")
     probability_typical: float = Field(description="Softmax probability for Typical")
     inference_time_ms: float = Field(description="Inference time in milliseconds")
     model_used: str = Field(description="'resnet50' or 'mobilenet_v2'")
+    facial_landmarks: Optional[List[Dict[str, Any]]] = Field(default=None, description="68 canonical facial landmark points")
+    top_pathways: Optional[List[SaliencyEdgeSchema]] = Field(default=None, description="Top morphological saliency edges")
+    network_attribution: Optional[Dict[str, float]] = Field(default=None, description="Phenotypic macro-domain attribution scores")
 

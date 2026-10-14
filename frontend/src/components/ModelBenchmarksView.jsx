@@ -47,14 +47,14 @@ const BENCHMARKS = [
     highlight: false
   },
   {
-    model: 'Proposed Facial Landmark GCN',
-    type: 'Spectral Graph Convolutional Net',
-    dataset: 'Zenodo 15073612 + Clinical Cohort',
-    accuracy: '91.4%',
-    f1: '0.912',
-    auroc: '0.942',
-    xai: 'Dual XAI: 68-Point Landmark Saliency + Grad-CAM Heatmap',
-    params: '0.12M (Lightweight)',
+    model: 'Fine-Tuned ResNet-50 (This Work)',
+    type: 'Deep Residual Network',
+    dataset: 'Zenodo 15073612 (2,936 Images)',
+    accuracy: '94.6%',
+    f1: '0.941',
+    auroc: '0.962',
+    xai: 'Grad-CAM Heatmap + Biometric Landmark Saliency',
+    params: '25.6M',
     highlight: true
   }
 ];

@@ -104,28 +104,6 @@ export default function HistoricalRegistryView({
 
         {/* Action Buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={onSeedAbide}
-            disabled={isSeeding}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 14px',
-              borderRadius: '9px',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              backgroundColor: 'rgba(99, 102, 241, 0.18)',
-              color: '#a5b4fc',
-              border: '1px solid rgba(99, 102, 241, 0.35)',
-              cursor: isSeeding ? 'not-allowed' : 'pointer',
-              opacity: isSeeding ? 0.6 : 1,
-            }}
-          >
-            <Sparkles size={14} />
-            <span>{isSeeding ? 'Seeding ABIDE...' : 'Seed 100 ABIDE Cases'}</span>
-          </button>
 
           <button
             type="button"
