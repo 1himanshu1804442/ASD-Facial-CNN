@@ -380,10 +380,10 @@ def run_pipeline(
 
     MODEL_META = {
         "modstem_lstm": ("Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)", "Proposed Architecture (Yadav et al., 2026)"),
-        "resnet50": ("ResNet-50 (Residual Baseline)", "Khan et al. [11] / Subah et al. [13]"),
+        "resnet50": ("ResNet-50 (Residual Baseline)", "Khan et al. [11] / Monani et al. [13]"),
         "densenet121": ("DenseNet-121 (Dense Feature-Reuse CNN)", "Khan et al. [11] (96.0% Acc on ASD)"),
         "efficientnet_b0": ("EfficientNet-B0 (Compound Scaled CNN)", "Rahman & Subashini [2] (96.6% AUC on Facial Screening)"),
-        "mobilenet_v2": ("MobileNet-V2 (Lightweight Mobile Triage)", "Alsaedi et al. [1] / Kanhirakadavath et al. [7]"),
+        "mobilenet_v2": ("MobileNet-V2 (Lightweight Mobile Triage)", "Beary et al. [1] / Alkahtani et al. [7]"),
         "vit": ("Vision Transformer ViT-B/16 (High Parameter Benchmark)", "Revathi & Arunarani [3] (ViT Attention on ASD)"),
     }
 

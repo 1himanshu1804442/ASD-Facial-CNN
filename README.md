@@ -90,8 +90,8 @@ All six candidate architectures were fine-tuned using transfer learning on the s
 | **Mod-Stem ResNet-50 + Bi-LSTM (Proposed)** | **Proposed (Yadav et al., 2026)** | **26.8 M** | **91.33%** | **90.67%** | **92.00%** | **0.9128** | **0.9582** | 64.2 ms |
 | **DenseNet-121 (Dense Feature Reuse)** | Khan et al. [11] (2024) | 7.0 M | 88.67% | 88.00% | 89.33% | 0.8859 | 0.9421 | 48.5 ms |
 | **EfficientNet-B0 (Compound Scaled)** | Rahman & Subashini [2] (2022) | 4.0 M | 87.67% | 86.67% | 88.67% | 0.8754 | 0.9385 | 35.8 ms |
-| **ResNet-50 (Residual Baseline)** | Khan et al. [11] / Subah et al. [13] | 25.6 M | 87.00% | 86.67% | 87.33% | 0.8696 | 0.9310 | 42.1 ms |
-| **MobileNet-V2 (Lightweight Triage)** | Alsaedi et al. [1] / Kanhirakadavath [7] | 3.5 M | 86.00% | 87.33% | 84.67% | 0.8618 | 0.9326 | **32.4 ms** |
+| **ResNet-50 (Residual Baseline)** | Khan et al. [11] / Monani et al. [13] | 25.6 M | 87.00% | 86.67% | 87.33% | 0.8696 | 0.9310 | 42.1 ms |
+| **MobileNet-V2 (Lightweight Triage)** | Beary et al. [1] / Alkahtani et al. [7] | 3.5 M | 86.00% | 87.33% | 84.67% | 0.8618 | 0.9326 | **32.4 ms** |
 | **ViT-B/16 (Vision Transformer)** | Revathi & Arunarani [3] (2026) | 86.6 M | 78.33% | 79.33% | 77.33% | 0.7855 | 0.8415 | 142.8 ms |
 
 ### Key Panel Takeaways:

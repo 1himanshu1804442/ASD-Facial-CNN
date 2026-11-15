@@ -18,7 +18,7 @@
   },
   "resnet50": {
     "architecture": "ResNet-50 (Residual Baseline)",
-    "literature_citation": "Khan et al. [11] / Subah et al. [13]",
+    "literature_citation": "Khan et al. [11] / Monani et al. [13]",
     "accuracy": 0.8700,
     "sensitivity": 0.8667,
     "specificity": 0.8733,
@@ -69,7 +69,7 @@
   },
   "mobilenet_v2": {
     "architecture": "MobileNet-V2 (Lightweight Mobile Triage)",
-    "literature_citation": "Alsaedi et al. [1] / Kanhirakadavath et al. [7]",
+    "literature_citation": "Beary et al. [1] / Alkahtani et al. [7]",
     "accuracy": 0.8600,
     "sensitivity": 0.8733,
     "specificity": 0.8467,

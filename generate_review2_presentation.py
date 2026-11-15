@@ -681,8 +681,8 @@ def create_presentation():
             "Ensures the AI does not have a bias toward either class."
         ]),
         ("Fast & Lightweight", [
-            "ResNet-50 runs in 48 milliseconds.",
-            "MobileNet-V2 runs in just 18 milliseconds.",
+            "ResNet-50 runs in 42 milliseconds.",
+            "MobileNet-V2 runs in just 32 milliseconds.",
             "Fast enough for real-time video or instant phone app usage."
         ]),
         ("Tested for Robustness", [
@@ -725,7 +725,7 @@ def create_presentation():
             "Python 3.11: Primary language for machine learning.",
             "PyTorch & Torchvision: Neural network training and transfer learning.",
             "Pillow (PIL): Image resizing and color normalization.",
-            "14/14 automated Pytest tests passed."
+            "15/15 automated Pytest tests passed."
         ]),
         ("High-Speed AI Service", "FastAPI Microservice", [
             "FastAPI: Lightweight, high-speed Python REST API on port 8000.",
@@ -739,7 +739,7 @@ def create_presentation():
             "25/25 automated JUnit tests passed."
         ]),
         ("Clinician Frontend Website", "React 18 & Tailwind CSS", [
-            "React 18 & Vite: Fast, responsive web dashboard on port 3000.",
+            "React 18 & Vite: Fast, responsive web dashboard on port 5173.",
             "HTML5 Canvas: Interactive 68-point facial landmark animation.",
             "Tailwind CSS: Modern dark-theme UI designed for doctors."
         ])
