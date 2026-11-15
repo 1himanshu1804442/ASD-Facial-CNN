@@ -47,14 +47,14 @@ const BENCHMARKS = [
     highlight: false
   },
   {
-    model: 'Fine-Tuned ResNet-50 (This Work)',
-    type: 'Deep Residual Network',
+    model: 'Mod-Stem ResNet-50 + LSTM (This Work)',
+    type: 'Hybrid CNN + Bi-LSTM',
     dataset: 'Zenodo 15073612 (2,936 Images)',
-    accuracy: '94.6%',
-    f1: '0.941',
-    auroc: '0.962',
-    xai: 'Grad-CAM Heatmap + Biometric Landmark Saliency',
-    params: '25.6M',
+    accuracy: '[ Pending ]',
+    f1: '[ Pending ]',
+    auroc: '[ Pending ]',
+    xai: 'Grad-CAM Heatmap + Landmark Saliency',
+    params: '26.8M',
     highlight: true
   }
 ];

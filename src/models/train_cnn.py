@@ -1,7 +1,7 @@
 """
 Convolutional Neural Network (CNN) Training Pipeline for NeuroGraph-ASD.
-Trains and exports authentic PyTorch weights for ResNet-50 and MobileNet-V2
-on the Zenodo Pediatric ASD Dataset.
+Trains and exports authentic PyTorch weights for Mod-Stem ResNet-50 + LSTM,
+ResNet-50, MobileNet-V2, and Vision Transformer (ViT) on the Zenodo Pediatric ASD Dataset.
 """
 
 import os
@@ -16,8 +16,10 @@ from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
 
 from src.models.cnn_models import (
+    build_modstem_resnet50_lstm,
     build_resnet50,
     build_mobilenet_v2,
+    build_vit,
     get_cnn_transforms,
     CLASS_NAMES
 )
@@ -33,7 +35,7 @@ def get_data_loaders(
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
     Constructs PyTorch DataLoaders for Train, Valid, and Test splits.
-    Applies standard ImageNet normalization and 224x224 resizing.
+    Applies data augmentation to training data and deterministic transforms to eval splits.
     
     Args:
         data_dir: Root path to 'ASD Data' folder.
@@ -43,7 +45,8 @@ def get_data_loaders(
     Returns:
         Tuple of (train_loader, val_loader, test_loader).
     """
-    transform = get_cnn_transforms()
+    train_transform = get_cnn_transforms(is_training=True)
+    eval_transform = get_cnn_transforms(is_training=False)
 
     train_path = data_dir / "Train"
     val_path = data_dir / "valid"
@@ -53,9 +56,9 @@ def get_data_loaders(
         raise FileNotFoundError(f"Training directory not found at: {train_path}")
 
     # Load ImageFolders
-    train_dataset = ImageFolder(root=str(train_path), transform=transform)
-    val_dataset = ImageFolder(root=str(val_path), transform=transform)
-    test_dataset = ImageFolder(root=str(test_path), transform=transform)
+    train_dataset = ImageFolder(root=str(train_path), transform=train_transform)
+    val_dataset = ImageFolder(root=str(val_path), transform=eval_transform)
+    test_dataset = ImageFolder(root=str(test_path), transform=eval_transform)
 
     logger.info(
         f"Loaded datasets from {data_dir}:\n"
@@ -122,8 +125,8 @@ def train_one_epoch(
         correct += (preds == labels).sum().item()
         total += labels.size(0)
 
-    epoch_loss = running_loss / total
-    epoch_acc = correct / total
+    epoch_loss = running_loss / total if total > 0 else 0.0
+    epoch_acc = correct / total if total > 0 else 0.0
     return epoch_loss, epoch_acc
 
 
@@ -134,10 +137,10 @@ def validate_model(
     device: torch.device
 ) -> Tuple[float, float]:
     """
-    Evaluates model performance on the validation dataset without gradient computation.
+    Evaluates model performance on validation/test dataset without gradient computation.
     
     Returns:
-        Tuple of (validation_loss, validation_accuracy).
+        Tuple of (loss, accuracy).
     """
     model.eval()
     running_loss = 0.0
@@ -157,9 +160,58 @@ def validate_model(
             correct += (preds == labels).sum().item()
             total += labels.size(0)
 
-    val_loss = running_loss / total
-    val_acc = correct / total
+    val_loss = running_loss / total if total > 0 else 0.0
+    val_acc = correct / total if total > 0 else 0.0
     return val_loss, val_acc
+
+
+def evaluate_test_metrics(
+    model: nn.Module,
+    test_loader: DataLoader,
+    device: torch.device
+) -> Dict[str, float]:
+    """
+    Computes comprehensive clinical metrics on held-out test cohort:
+    Accuracy, Sensitivity (Recall for ASD), Specificity (Recall for Typical), and Precision.
+    """
+    model.eval()
+    all_preds = []
+    all_labels = []
+
+    with torch.no_grad():
+        for images, labels in test_loader:
+            images = images.to(device)
+            outputs = model(images)
+            _, preds = torch.max(outputs, 1)
+            all_preds.extend(preds.cpu().numpy().tolist())
+            all_labels.extend(labels.numpy().tolist())
+
+    tp = sum(1 for p, y in zip(all_preds, all_labels) if p == 0 and y == 0)  # Class 0: ASD
+    fn = sum(1 for p, y in zip(all_preds, all_labels) if p == 1 and y == 0)
+    tn = sum(1 for p, y in zip(all_preds, all_labels) if p == 1 and y == 1)  # Class 1: Typical
+    fp = sum(1 for p, y in zip(all_preds, all_labels) if p == 0 and y == 1)
+
+    total = len(all_labels)
+    acc = (tp + tn) / total if total > 0 else 0.0
+    sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+
+    metrics = {
+        "test_accuracy": round(acc * 100.0, 2),
+        "sensitivity": round(sensitivity * 100.0, 2),
+        "specificity": round(specificity * 100.0, 2),
+        "precision": round(precision * 100.0, 2),
+        "total_evaluated": total,
+    }
+    logger.info(
+        f"Test Benchmark Evaluation:\n"
+        f"  - Accuracy:    {metrics['test_accuracy']}%\n"
+        f"  - Sensitivity: {metrics['sensitivity']}%\n"
+        f"  - Specificity: {metrics['specificity']}%\n"
+        f"  - Precision:   {metrics['precision']}%"
+    )
+    return metrics
 
 
 def train_and_export_cnn(
@@ -172,37 +224,30 @@ def train_and_export_cnn(
     device: torch.device = None
 ) -> nn.Module:
     """
-    Trains a transfer learning CNN for pediatric ASD facial image classification
+    Trains a model for pediatric ASD facial image classification
     and exports authentic PyTorch model weights to disk.
-
-    Args:
-        model_name: "resnet50" or "mobilenet_v2"
-        train_loader: Training DataLoader
-        val_loader: Validation DataLoader
-        output_path: Destination .pth file path
-        epochs: Number of epochs (default: 5)
-        lr: Learning rate for Adam optimizer (default: 1e-4)
-        device: Torch compute device (CPU or CUDA)
-
-    Returns:
-        Trained PyTorch model nn.Module.
     """
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    logger.info(f"--- Initializing {model_name.upper()} Transfer Learning on {device} ---")
+    logger.info(f"--- Initializing {model_name.upper()} Architecture on {device} ---")
 
-    # Instantiate model with pretrained weights and modified classification head
-    if model_name.lower() in ["resnet50", "resnet-50"]:
+    # Instantiate requested model architecture
+    norm_name = model_name.lower().replace("-", "_")
+    if norm_name in ["modstem_lstm", "modstem_resnet50_lstm", "hybrid_resnet50_lstm"]:
+        model = build_modstem_resnet50_lstm(pretrained=True, num_classes=2)
+    elif norm_name in ["resnet50", "resnet_50"]:
         model = build_resnet50(pretrained=True, num_classes=2)
-    elif model_name.lower() in ["mobilenet_v2", "mobilenetv2"]:
+    elif norm_name in ["mobilenet_v2", "mobilenetv2"]:
         model = build_mobilenet_v2(pretrained=True, num_classes=2)
+    elif norm_name in ["vit", "vit_b_16", "vision_transformer"]:
+        model = build_vit(pretrained=True, num_classes=2)
     else:
-        raise ValueError(f"Unsupported model name: {model_name}")
+        raise ValueError(f"Unsupported model architecture: {model_name}")
 
     model = model.to(device)
 
-    # Filter trainable parameters only (since early layers are frozen)
+    # Filter trainable parameters only
     trainable_params = [p for p in model.parameters() if p.requires_grad]
     logger.info(
         f"Model {model_name} total parameters: {sum(p.numel() for p in model.parameters()):,} | "
@@ -256,10 +301,18 @@ def run_pipeline(
     lr: float = 1e-4
 ):
     """
-    Executes complete training and export pipeline for both ResNet-50 and MobileNet-V2.
+    Executes complete training and export pipeline for Mod-Stem ResNet-50 + LSTM,
+    ResNet-50 baseline, and MobileNet-V2.
     """
     project_root = Path(__file__).resolve().parent.parent.parent
     data_dir = project_root / data_dir_str if not Path(data_dir_str).is_absolute() else Path(data_dir_str)
+    
+    # Check if local Downloads dataset exists as fallback if project data path not yet extracted
+    if not data_dir.exists():
+        fallback_data = Path(r"C:\Users\hy180\Downloads\Zenodo_ASD_Dataset\ASD Data")
+        if fallback_data.exists():
+            data_dir = fallback_data
+
     models_dir = project_root / models_dir_str if not Path(models_dir_str).is_absolute() else Path(models_dir_str)
 
     logger.info(f"Dataset root: {data_dir}")
@@ -268,9 +321,7 @@ def run_pipeline(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
 
-    # Set intra-op parallelism for PyTorch CPU compute
     if device.type == "cpu":
-        # Reserve adequate cores for OS while utilizing high throughput
         torch.set_num_threads(min(8, os.cpu_count() or 4))
         logger.info(f"Configured PyTorch CPU threads: {torch.get_num_threads()}")
 
@@ -280,9 +331,22 @@ def run_pipeline(
         num_workers=0
     )
 
-    # 1. Train and save ResNet-50
+    # 1. Train and save Mod-Stem ResNet-50 + LSTM (Proposed Primary Model)
+    modstem_path = models_dir / "modstem_resnet50_lstm_asd.pth"
+    modstem_model = train_and_export_cnn(
+        model_name="modstem_lstm",
+        train_loader=train_loader,
+        val_loader=val_loader,
+        output_path=modstem_path,
+        epochs=epochs,
+        lr=lr,
+        device=device
+    )
+    evaluate_test_metrics(modstem_model, test_loader, device)
+
+    # 2. Train and save baseline ResNet-50
     resnet_path = models_dir / "resnet50_asd.pth"
-    train_and_export_cnn(
+    resnet_model = train_and_export_cnn(
         model_name="resnet50",
         train_loader=train_loader,
         val_loader=val_loader,
@@ -291,10 +355,11 @@ def run_pipeline(
         lr=lr,
         device=device
     )
+    evaluate_test_metrics(resnet_model, test_loader, device)
 
-    # 2. Train and save MobileNet-V2
+    # 3. Train and save MobileNet-V2
     mobilenet_path = models_dir / "mobilenetv2_asd.pth"
-    train_and_export_cnn(
+    mobilenet_model = train_and_export_cnn(
         model_name="mobilenet_v2",
         train_loader=train_loader,
         val_loader=val_loader,
@@ -303,8 +368,9 @@ def run_pipeline(
         lr=lr,
         device=device
     )
+    evaluate_test_metrics(mobilenet_model, test_loader, device)
 
-    logger.info("All CNN model weights trained and exported successfully!")
+    logger.info("All CNN & Hybrid model weights trained and exported successfully!")
 
 
 if __name__ == "__main__":

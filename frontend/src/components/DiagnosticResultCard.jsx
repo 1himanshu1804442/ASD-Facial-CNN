@@ -42,11 +42,14 @@ export default function DiagnosticResultCard({
 }) {
   if (!result) return null;
 
+  const isAwaiting = result.isAwaitingInference || result.predicted_class === null || result.predicted_class === undefined;
+
   // Determine whether the triage outcome is ASD or Typical Control
-  const isASD =
+  const isASD = !isAwaiting && (
     result.predicted_class === 1 ||
     result.predictedClass === 1 ||
-    (result.predicted_label && result.predicted_label.toLowerCase().includes('autism'));
+    (result.predicted_label && result.predicted_label.toLowerCase().includes('autism'))
+  );
 
   // Extract probability values with safe fallbacks
   const asdVal = result.asd_probability ?? result.asdProbability ?? (isASD ? 0.918 : 0.084);
@@ -56,11 +59,13 @@ export default function DiagnosticResultCard({
   const controlPct = (controlVal * 100).toFixed(1);
 
   // Formatting strings
-  const outcomeTitle = isASD
-    ? 'Autism Spectrum Disorder (ASD) Detected'
-    : 'Typical Development / Non-ASD';
+  const outcomeTitle = isAwaiting
+    ? 'Awaiting Neural Network Screening'
+    : (isASD
+        ? 'Autism Spectrum Disorder (ASD) Detected'
+        : 'Typical Development / Non-ASD');
 
-  const confidencePct = result.confidence_percentage ?? (isASD ? asdPct : controlPct);
+  const confidencePct = isAwaiting ? '50.0' : (result.confidence_percentage ?? (isASD ? asdPct : controlPct));
   const subjectId = result.subject_id || result.demographics?.subject_id || 'PATIENT_SAMPLE';
 
   // Effective model backbone name and latency
@@ -130,13 +135,15 @@ export default function DiagnosticResultCard({
               margin: 0,
               fontSize: '1.45rem',
               fontWeight: 800,
-              color: isASD ? '#f87171' : '#34d399',
+              color: isAwaiting ? '#38bdf8' : (isASD ? '#f87171' : '#34d399'),
               display: 'flex',
               alignItems: 'center',
               gap: '10px',
             }}
           >
-            {isASD ? (
+            {isAwaiting ? (
+              <Activity size={28} className="text-sky-400 shrink-0 animate-pulse" />
+            ) : isASD ? (
               <AlertTriangle size={28} className="text-red-400 shrink-0" />
             ) : (
               <CheckCircle2 size={28} className="text-emerald-400 shrink-0" />
@@ -148,10 +155,16 @@ export default function DiagnosticResultCard({
         {/* Confidence Percentage Badge */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
           <span
-            className={isASD ? 'badge badge-danger' : 'badge badge-success'}
-            style={{ fontSize: '0.85rem', padding: '6px 12px' }}
+            className={isAwaiting ? 'badge' : (isASD ? 'badge badge-danger' : 'badge badge-success')}
+            style={{
+              fontSize: '0.85rem',
+              padding: '6px 12px',
+              backgroundColor: isAwaiting ? 'rgba(56, 189, 248, 0.15)' : undefined,
+              color: isAwaiting ? '#38bdf8' : undefined,
+              border: isAwaiting ? '1px solid rgba(56, 189, 248, 0.3)' : undefined,
+            }}
           >
-            Confidence: {confidencePct}%
+            {isAwaiting ? 'Ready to Screen' : `Confidence: ${confidencePct}%`}
           </span>
           <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
             Subject: <strong style={{ color: '#e2e8f0' }}>{subjectId}</strong>

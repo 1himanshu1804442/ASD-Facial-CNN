@@ -15,8 +15,10 @@ from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Que
 from fastapi.middleware.cors import CORSMiddleware
 from src.models.facial_gcn import FacialGCN, build_canonical_68_edges, generate_gradcam_heatmap
 from src.models.cnn_models import (
+    build_modstem_resnet50_lstm,
     build_resnet50,
     build_mobilenet_v2,
+    build_vit,
     get_cnn_transforms,
     CLASS_NAMES
 )
@@ -146,13 +148,21 @@ def get_services():
 _cnn_models: Dict[str, torch.nn.Module] = {}
 
 
-def get_cnn_model(model_name: str = "resnet50") -> Tuple[torch.nn.Module, str]:
+def get_cnn_model(model_name: str = "modstem_lstm") -> Tuple[torch.nn.Module, str]:
     """
-    Lazy loader for fine-tuned CNN vision backbones (ResNet-50 and MobileNet-V2).
+    Lazy loader for vision models (Mod-Stem ResNet-50 + LSTM Hybrid, ResNet-50, MobileNet-V2, and ViT).
     Caches model instances in memory for real-time inference.
     """
     global _cnn_models
-    normalized = "resnet50" if "resnet" in model_name.lower() else "mobilenet_v2"
+    low = model_name.lower()
+    if "modstem" in low or "lstm" in low or "hybrid" in low:
+        normalized = "modstem_lstm"
+    elif "mobilenet" in low:
+        normalized = "mobilenet_v2"
+    elif "vit" in low or "transformer" in low:
+        normalized = "vit"
+    else:
+        normalized = "resnet50"
 
     if normalized in _cnn_models:
         return _cnn_models[normalized], normalized
@@ -160,18 +170,27 @@ def get_cnn_model(model_name: str = "resnet50") -> Tuple[torch.nn.Module, str]:
     project_root = Path(__file__).resolve().parent.parent.parent
     models_dir = project_root / "models"
 
-    if normalized == "resnet50":
-        model = build_resnet50(pretrained=False, num_classes=2).to(_device)
-        weights_file = models_dir / "resnet50_asd.pth"
-    else:
-        model = build_mobilenet_v2(pretrained=False, num_classes=2).to(_device)
+    if normalized == "modstem_lstm":
+        model = build_modstem_resnet50_lstm(pretrained=True, num_classes=2).to(_device)
+        weights_file = models_dir / "modstem_resnet50_lstm_asd.pth"
+    elif normalized == "mobilenet_v2":
+        model = build_mobilenet_v2(pretrained=True, num_classes=2).to(_device)
         weights_file = models_dir / "mobilenetv2_asd.pth"
+    elif normalized == "vit":
+        model = build_vit(pretrained=True, num_classes=2).to(_device)
+        weights_file = models_dir / "vit_asd.pth"
+    else:
+        model = build_resnet50(pretrained=True, num_classes=2).to(_device)
+        weights_file = models_dir / "resnet50_asd.pth"
 
     if weights_file.exists():
         logger.info(f"Loading authentic {normalized} weights from {weights_file}")
-        model.load_state_dict(torch.load(weights_file, map_location=_device))
+        try:
+            model.load_state_dict(torch.load(weights_file, map_location=_device))
+        except Exception as e:
+            logger.warning(f"Could not load state_dict for {normalized} ({e}). Running with pretrained backbone.")
     else:
-        logger.warning(f"Weights file not found at {weights_file}. Running with initialized architecture.")
+        logger.warning(f"Weights file not found at {weights_file}. Running with initialized pretrained architecture.")
 
     model.eval()
     _cnn_models[normalized] = model
@@ -348,17 +367,20 @@ def predict_diagnosis(request: PredictionRequest):
 @app.post("/api/predict/image", response_model=ImagePredictionResponse)
 async def predict_image(
     file: UploadFile = File(...),
-    model_type: str = Query(default="resnet50", description="Model architecture: 'resnet50' or 'mobilenet_v2'")
+    model_type: Optional[str] = Query(default=None, description="Model architecture: 'modstem_lstm', 'resnet50', 'mobilenet_v2', or 'vit'"),
+    model_type_form: Optional[str] = Form(default=None, alias="model_type"),
+    model_type_camel: Optional[str] = Form(default=None, alias="modelType")
 ):
     """
     Executes transfer-learning CNN screening on uploaded portrait image:
     1. Validates and decodes image bytes using PIL.
     2. Applies standard ImageNet normalization and 224x224 resizing.
-    3. Runs inference through specified model (ResNet-50 or MobileNet-V2).
+    3. Runs inference through specified model (Mod-Stem ResNet-50 + LSTM, ResNet-50, MobileNet-V2, or ViT).
     4. Computes softmax probabilities and clinical classification.
     5. Measures and returns precise inference latency in milliseconds.
     """
-    logger.info(f"Received image inference request with model_type='{model_type}', filename='{file.filename}'")
+    effective_model = model_type or model_type_form or model_type_camel or "modstem_lstm"
+    logger.info(f"Received image inference request with model_type='{effective_model}', filename='{file.filename}'")
 
     contents = await file.read()
     if len(contents) == 0:
@@ -377,7 +399,7 @@ async def predict_image(
     input_tensor = transform(image).unsqueeze(0).to(_device)
 
     # Load and run model
-    model, resolved_model_name = get_cnn_model(model_type)
+    model, resolved_model_name = get_cnn_model(effective_model)
 
     with torch.no_grad():
         logits = model(input_tensor)

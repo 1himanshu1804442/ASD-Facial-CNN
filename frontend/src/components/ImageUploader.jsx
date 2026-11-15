@@ -39,7 +39,7 @@ export default function ImageUploader({
   onRunInference,
   isLoading = false,
   onClearImage,
-  selectedModelType = 'ResNet-50',
+  selectedModelType = 'Mod-Stem ResNet-50 + LSTM',
   onModelTypeChange,
 }) {
   const fileInputRef = useRef(null);
@@ -258,7 +258,7 @@ export default function ImageUploader({
         </div>
       </div>
 
-      {/* Backbone Architecture Selector (ResNet-50 vs MobileNet-V2) */}
+      {/* Backbone Architecture Selector (Mod-Stem LSTM, ResNet-50, MobileNet-V2, ViT) */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -266,12 +266,57 @@ export default function ImageUploader({
             CNN Backbone Architecture:
           </label>
           <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-            Selectable Model Weights
+            Selectable Model Architecture
           </span>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '12px' }}>
-          {/* Architecture Option 1: ResNet-50 (Deep High Precision) */}
+          {/* Architecture Option 1: Mod-Stem ResNet-50 + LSTM (Proposed Hybrid) */}
+          <button
+            type="button"
+            onClick={() => onModelTypeChange && onModelTypeChange('Mod-Stem ResNet-50 + LSTM')}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              padding: '12px 14px',
+              borderRadius: '12px',
+              textAlign: 'left',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              backgroundColor: (selectedModelType === 'Mod-Stem ResNet-50 + LSTM' || selectedModelType === 'modstem_lstm') ? 'rgba(99, 102, 241, 0.28)' : 'rgba(15, 23, 42, 0.65)',
+              border: `1.5px solid ${(selectedModelType === 'Mod-Stem ResNet-50 + LSTM' || selectedModelType === 'modstem_lstm') ? '#818cf8' : 'rgba(255, 255, 255, 0.08)'}`,
+              boxShadow: (selectedModelType === 'Mod-Stem ResNet-50 + LSTM' || selectedModelType === 'modstem_lstm') ? '0 0 16px rgba(99, 102, 241, 0.35)' : 'none',
+            }}
+            className="glass-panel-hover"
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '4px' }}>
+              <span style={{ fontSize: '0.86rem', fontWeight: 700, color: (selectedModelType === 'Mod-Stem ResNet-50 + LSTM' || selectedModelType === 'modstem_lstm') ? '#ffffff' : '#cbd5e1' }}>
+                MOD-STEM + LSTM
+              </span>
+              <span
+                style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(99, 102, 241, 0.25)',
+                  color: '#a5b4fc',
+                  border: '1px solid rgba(99, 102, 241, 0.45)',
+                }}
+              >
+                Proposed Hybrid
+              </span>
+            </div>
+            <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+              3×3 Mod-Stem • Bi-LSTM Sequence
+            </span>
+            <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '3px' }}>
+              Preserves subtle pediatric facial geometry across vertical anatomical slices
+            </span>
+          </button>
+
+          {/* Architecture Option 2: ResNet-50 (Baseline CNN) */}
           <button
             type="button"
             onClick={() => onModelTypeChange && onModelTypeChange('ResNet-50')}
@@ -284,9 +329,9 @@ export default function ImageUploader({
               textAlign: 'left',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
-              backgroundColor: selectedModelType === 'ResNet-50' ? 'rgba(99, 102, 241, 0.22)' : 'rgba(15, 23, 42, 0.65)',
-              border: `1.5px solid ${selectedModelType === 'ResNet-50' ? '#818cf8' : 'rgba(255, 255, 255, 0.08)'}`,
-              boxShadow: selectedModelType === 'ResNet-50' ? '0 0 16px rgba(99, 102, 241, 0.3)' : 'none',
+              backgroundColor: selectedModelType === 'ResNet-50' ? 'rgba(59, 130, 246, 0.22)' : 'rgba(15, 23, 42, 0.65)',
+              border: `1.5px solid ${selectedModelType === 'ResNet-50' ? '#60a5fa' : 'rgba(255, 255, 255, 0.08)'}`,
+              boxShadow: selectedModelType === 'ResNet-50' ? '0 0 16px rgba(59, 130, 246, 0.3)' : 'none',
             }}
             className="glass-panel-hover"
           >
@@ -300,23 +345,23 @@ export default function ImageUploader({
                   fontWeight: 600,
                   padding: '2px 8px',
                   borderRadius: '9999px',
-                  backgroundColor: 'rgba(99, 102, 241, 0.2)',
-                  color: '#818cf8',
-                  border: '1px solid rgba(99, 102, 241, 0.35)',
+                  backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                  color: '#93c5fd',
+                  border: '1px solid rgba(59, 130, 246, 0.35)',
                 }}
               >
-                Deep High Precision
+                Residual Baseline
               </span>
             </div>
             <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-              50 Residual Layers • 94.6% Accuracy
+              Standard 7×7 Stem • Global Avg Pool
             </span>
             <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '3px' }}>
-              Deep feature representations for subtle facial dysmorphology
+              Standard deep feature extractor for baseline comparison
             </span>
           </button>
 
-          {/* Architecture Option 2: MobileNet-V2 (Lightweight Fast Triage) */}
+          {/* Architecture Option 3: MobileNet-V2 (Lightweight Fast Triage) */}
           <button
             type="button"
             onClick={() => onModelTypeChange && onModelTypeChange('MobileNet-V2')}
@@ -350,14 +395,59 @@ export default function ImageUploader({
                   border: '1px solid rgba(16, 185, 129, 0.35)',
                 }}
               >
-                Lightweight Fast Triage
+                Lightweight Fast
               </span>
             </div>
             <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-              Depthwise Separable Conv • ~38 ms Latency
+              Depthwise Separable • 3.4M Params
             </span>
             <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '3px' }}>
-              Ultra-fast inference for rapid point-of-care clinic screening
+              Ultra-fast mobile inference for rapid point-of-care clinic screening
+            </span>
+          </button>
+
+          {/* Architecture Option 4: Vision Transformer (ViT-B/16 Comparison) */}
+          <button
+            type="button"
+            onClick={() => onModelTypeChange && onModelTypeChange('ViT-B/16')}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              padding: '12px 14px',
+              borderRadius: '12px',
+              textAlign: 'left',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              backgroundColor: (selectedModelType === 'ViT-B/16' || selectedModelType === 'vit') ? 'rgba(245, 158, 11, 0.2)' : 'rgba(15, 23, 42, 0.65)',
+              border: `1.5px solid ${(selectedModelType === 'ViT-B/16' || selectedModelType === 'vit') ? '#fbbf24' : 'rgba(255, 255, 255, 0.08)'}`,
+              boxShadow: (selectedModelType === 'ViT-B/16' || selectedModelType === 'vit') ? '0 0 16px rgba(245, 158, 11, 0.3)' : 'none',
+            }}
+            className="glass-panel-hover"
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '4px' }}>
+              <span style={{ fontSize: '0.86rem', fontWeight: 700, color: (selectedModelType === 'ViT-B/16' || selectedModelType === 'vit') ? '#ffffff' : '#cbd5e1' }}>
+                ViT-B/16
+              </span>
+              <span
+                style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                  color: '#fbbf24',
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                }}
+              >
+                Transformer Bench
+              </span>
+            </div>
+            <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+              16×16 Patches • 86.6M Params
+            </span>
+            <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '3px' }}>
+              Self-attention benchmark compared against inductive bias models
             </span>
           </button>
         </div>

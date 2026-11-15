@@ -499,12 +499,18 @@ export function createSamplePortraitFile(sampleId) {
  * @param {File|null} customFile - User uploaded custom portrait file.
  * @param {string} [modelType='ResNet-50'] - Active CNN backbone architecture ('ResNet-50' or 'MobileNet-V2').
  */
-export function generateImageFallbackResult(sampleIdOrPreset, customFile = null, modelType = 'ResNet-50') {
+export function generateImageFallbackResult(sampleIdOrPreset, customFile = null, modelType = 'Mod-Stem ResNet-50 + LSTM') {
   const isMobileNet = modelType === 'MobileNet-V2';
+  const isViT = modelType === 'ViT-B/16' || modelType === 'vit';
+  const isResNet = modelType === 'ResNet-50';
   const backboneLabel = isMobileNet
     ? 'MobileNet-V2 (Lightweight Fast Triage)'
-    : 'ResNet-50 (Deep High Precision)';
-  const latencyMs = isMobileNet ? 38 : 114;
+    : isViT
+    ? 'ViT-B/16 (Vision Transformer Comparison)'
+    : isResNet
+    ? 'ResNet-50 (Deep High Precision Baseline)'
+    : 'Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)';
+  const latencyMs = isMobileNet ? 38 : (isViT ? 142 : (isResNet ? 88 : 106));
 
   // If matched to a preset, use its finely tuned clinical parameters
   const matchedPreset = PRESET_SAMPLE_PORTRAITS.find((s) => s.id === sampleIdOrPreset);
@@ -529,12 +535,9 @@ export function generateImageFallbackResult(sampleIdOrPreset, customFile = null,
     };
   }
 
-  // Fallback for custom user uploaded photos: deterministic extraction
+  // Fallback for custom user uploaded photos: Never guess or fake diagnosis from filename.
+  // Real clinical screening requires model inference execution.
   const fileName = customFile ? customFile.name : 'UPLOADED_PATIENT_PHOTO.jpg';
-  const isLikelyASD = !fileName.toLowerCase().includes('control');
-  const asd_probability = isLikelyASD ? 0.892 : 0.124;
-  const control_probability = Math.round((1.0 - asd_probability) * 1000) / 1000;
-  const confidence_percentage = Math.round((isLikelyASD ? asd_probability : control_probability) * 1000) / 10;
 
   return {
     subject_id: `PATIENT_IMG_${Math.floor(1000 + Math.random() * 9000)}`,
@@ -545,39 +548,31 @@ export function generateImageFallbackResult(sampleIdOrPreset, customFile = null,
       full_scale_iq: 101.0,
       site_id: 'CLINICAL_SCREENING_LAB',
     },
-    predicted_class: isLikelyASD ? 1 : 0,
-    predicted_label: isLikelyASD ? 'Autism Spectrum Disorder' : 'Typical Control',
-    asd_probability,
-    control_probability,
-    confidence_percentage,
+    predicted_class: null,
+    predicted_label: 'Awaiting Model Inference',
+    asd_probability: 0.50,
+    control_probability: 0.50,
+    confidence_percentage: 50.0,
+    isAwaitingInference: true,
     landmarks_68: CANONICAL_68_LANDMARKS,
     gcn_saliency_edges: [
-      { source: 36, target: 45, saliency: isLikelyASD ? 0.945 : 0.280, label: 'Inter-ocular Distance' },
-      { source: 39, target: 42, saliency: isLikelyASD ? 0.902 : 0.250, label: 'Intercanthal Breadth' },
-      { source: 33, target: 51, saliency: isLikelyASD ? 0.865 : 0.210, label: 'Philtrum Dysmorphology' },
-      { source: 37, target: 40, saliency: isLikelyASD ? 0.835 : 0.240, label: 'Palpebral Fissure' },
-      { source: 27, target: 33, saliency: isLikelyASD ? 0.785 : 0.190, label: 'Midface Ratio' },
-      { source: 48, target: 54, saliency: isLikelyASD ? 0.720 : 0.170, label: 'Cheilion Breadth' },
+      { source: 36, target: 45, saliency: 0.50, label: 'Inter-ocular Distance' },
+      { source: 39, target: 42, saliency: 0.50, label: 'Intercanthal Breadth' },
+      { source: 33, target: 51, saliency: 0.50, label: 'Philtrum Symmetry' },
+      { source: 37, target: 40, saliency: 0.50, label: 'Palpebral Fissure' },
+      { source: 27, target: 33, saliency: 0.50, label: 'Midface Ratio' },
+      { source: 48, target: 54, saliency: 0.50, label: 'Cheilion Breadth' },
     ],
-    gradcam_hotspots: isLikelyASD
-      ? [
-          { x: 0.50, y: 0.37, radius: 0.22, intensity: 0.96, name: 'Periorbital Region' },
-          { x: 0.37, y: 0.38, radius: 0.14, intensity: 0.91, name: 'Right Gaze Focus' },
-          { x: 0.63, y: 0.38, radius: 0.14, intensity: 0.89, name: 'Left Gaze Focus' },
-          { x: 0.50, y: 0.61, radius: 0.13, intensity: 0.82, name: 'Philtrum' },
-        ]
-      : [
-          { x: 0.50, y: 0.45, radius: 0.18, intensity: 0.20, name: 'Diffuse Symmetrical' },
-        ],
+    gradcam_hotspots: [
+      { x: 0.50, y: 0.45, radius: 0.18, intensity: 0.50, name: 'Facial Landmark Center' },
+    ],
     biomarkers: {
-      facial_asymmetry_index: isLikelyASD ? 0.87 : 0.14,
-      periorbital_saliency: isLikelyASD ? 0.93 : 0.19,
-      philtrum_dysmorphology_score: isLikelyASD ? 0.85 : 0.16,
-      intercanthal_ratio: isLikelyASD ? 0.90 : 0.21,
+      facial_asymmetry_index: 0.50,
+      periorbital_saliency: 0.50,
+      philtrum_dysmorphology_score: 0.50,
+      intercanthal_ratio: 0.50,
     },
-    clinical_note: isLikelyASD
-      ? 'Significant facial dysmorphology markers identified in periorbital breadth and philtrum structure exceeding normal neurodevelopmental variance.'
-      : 'Facial landmarks align with neurotypical symmetry and baseline anatomical standards.',
+    clinical_note: 'Uploaded portrait loaded. Click "Run Screening" to execute neural network inference.',
     image_source_name: fileName,
     model_backbone: backboneLabel,
     modelType: modelType,

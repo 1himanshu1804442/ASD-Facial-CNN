@@ -143,10 +143,10 @@ export function useNeuroGraph() {
   const [uploadedImageFile, setUploadedImageFile] = useState(() => createSamplePortraitFile('pediatric_asd'));
   const [imagePreviewUrl, setImagePreviewUrl] = useState(() => PRESET_SAMPLE_PORTRAITS[0].imageUrl);
   const [activeVisionTab, setActiveVisionTab] = useState('landmarks'); // 'landmarks' | 'gradcam'
-  const [selectedModelType, setSelectedModelType] = useState('ResNet-50'); // 'ResNet-50' | 'MobileNet-V2'
-  const [inferenceLatencyMs, setInferenceLatencyMs] = useState(114);
+  const [selectedModelType, setSelectedModelType] = useState('Mod-Stem ResNet-50 + LSTM');
+  const [inferenceLatencyMs, setInferenceLatencyMs] = useState(106);
   const [imagePredictionResult, setImagePredictionResult] = useState(() =>
-    generateImageFallbackResult('pediatric_asd', null, 'ResNet-50')
+    generateImageFallbackResult('pediatric_asd', null, 'Mod-Stem ResNet-50 + LSTM')
   );
 
   // 1. Health Status Query
@@ -299,7 +299,11 @@ export function useNeuroGraph() {
           data.model_backbone ??
           (modelType === 'MobileNet-V2'
             ? 'MobileNet-V2 (Lightweight Fast Triage)'
-            : 'ResNet-50 (Deep High Precision)'),
+            : modelType === 'ViT-B/16' || modelType === 'vit'
+            ? 'ViT-B/16 (Vision Transformer Comparison)'
+            : modelType === 'ResNet-50'
+            ? 'ResNet-50 (Deep High Precision Baseline)'
+            : 'Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)'),
         modelType: modelType,
       };
     },
@@ -315,13 +319,17 @@ export function useNeuroGraph() {
     onError: (error, variables) => {
       console.warn('[useNeuroGraph] Backend image endpoint offline/bootstrap, activating rich clinical fallback:', error);
       const activeModel = variables?.modelType || selectedModelType;
-      const simulatedLatency = activeModel === 'MobileNet-V2' ? 38 : 114;
+      const simulatedLatency = activeModel === 'MobileNet-V2' ? 38 : (activeModel === 'ViT-B/16' || activeModel === 'vit' ? 142 : (activeModel === 'ResNet-50' ? 88 : 106));
       setInferenceLatencyMs(simulatedLatency);
       const fallback = generateImageFallbackResult(selectedPortraitPresetId, uploadedImageFile, activeModel);
       fallback.inference_latency_ms = simulatedLatency;
       fallback.model_backbone = activeModel === 'MobileNet-V2'
         ? 'MobileNet-V2 (Lightweight Fast Triage)'
-        : 'ResNet-50 (Deep High Precision)';
+        : (activeModel === 'ViT-B/16' || activeModel === 'vit')
+        ? 'ViT-B/16 (Vision Transformer Comparison)'
+        : activeModel === 'ResNet-50'
+        ? 'ResNet-50 (Deep High Precision Baseline)'
+        : 'Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)';
       setImagePredictionResult(fallback);
       setPredictionResult(fallback);
     },
@@ -333,7 +341,7 @@ export function useNeuroGraph() {
   const handleModelTypeChange = (newModel) => {
     console.info('[useNeuroGraph] Switching CNN backbone model to:', newModel);
     setSelectedModelType(newModel);
-    const latency = newModel === 'MobileNet-V2' ? 38 : 114;
+    const latency = newModel === 'MobileNet-V2' ? 38 : (newModel === 'ViT-B/16' || newModel === 'vit' ? 142 : (newModel === 'ResNet-50' ? 88 : 106));
     setInferenceLatencyMs(latency);
 
     if (imagePredictionResult) {
@@ -342,7 +350,11 @@ export function useNeuroGraph() {
         modelType: newModel,
         model_backbone: newModel === 'MobileNet-V2'
           ? 'MobileNet-V2 (Lightweight Fast Triage)'
-          : 'ResNet-50 (Deep High Precision)',
+          : (newModel === 'ViT-B/16' || newModel === 'vit')
+          ? 'ViT-B/16 (Vision Transformer Comparison)'
+          : newModel === 'ResNet-50'
+          ? 'ResNet-50 (Deep High Precision Baseline)'
+          : 'Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)',
         inference_latency_ms: latency,
       }));
     }
@@ -363,9 +375,9 @@ export function useNeuroGraph() {
     const reader = new FileReader();
     reader.onload = (e) => {
       setImagePreviewUrl(e.target.result);
-      const fallback = generateImageFallbackResult('custom', file, selectedModelType);
-      setImagePredictionResult(fallback);
-      setPredictionResult(fallback);
+      // Clear previous inference results so user must explicitly trigger backend screening
+      setImagePredictionResult(null);
+      setPredictionResult(null);
     };
     reader.readAsDataURL(file);
   };
