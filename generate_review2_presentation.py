@@ -633,29 +633,31 @@ def create_presentation():
     set_slide_header(slide10, "8. Results and Discussion: Real Benchmark Performance")
 
     # Table
-    table_shape10 = slide10.shapes.add_table(5, 7, Inches(0.8), Inches(1.5), Inches(11.73), Inches(2.4))
+    table_shape10 = slide10.shapes.add_table(7, 7, Inches(0.8), Inches(1.35), Inches(11.73), Inches(2.65))
     t10 = table_shape10.table
-    col_widths = [Inches(2.2), Inches(1.5), Inches(1.5), Inches(1.5), Inches(1.5), Inches(1.7), Inches(1.83)]
+    col_widths = [Inches(2.5), Inches(1.4), Inches(1.4), Inches(1.4), Inches(1.4), Inches(1.6), Inches(2.03)]
     for idx, w in enumerate(col_widths):
         t10.columns[idx].width = w
 
-    t10_headers = ["Model", "Accuracy", "Precision", "Recall", "F1-Score", "Speed (Latency)", "Best Use Case"]
+    t10_headers = ["Model Architecture", "Accuracy", "Precision", "Recall", "F1-Score", "Speed (Latency)", "Best Clinical Use Case"]
     for col_idx, text in enumerate(t10_headers):
         cell = t10.cell(0, col_idx)
         cell.text = text
         cell.fill.solid()
         cell.fill.fore_color.rgb = PRIMARY_BLUE
         for p in cell.text_frame.paragraphs:
-            p.font.size = Pt(10)
+            p.font.size = Pt(9.5)
             p.font.bold = True
             p.font.color.rgb = WHITE
             p.alignment = PP_ALIGN.CENTER
 
     res_data = [
-        ("ResNet-50 (Our Model)", "92.4%", "93.1%", "91.8%", "92.4%", "48 ms", "Hospital / Clinic PC"),
-        ("MobileNet-V2 (Our Model)", "90.8%", "91.5%", "89.9%", "90.7%", "18 ms", "Mobile Phones / Apps"),
-        ("VGG16 Baseline", "86.3%", "84.7%", "87.6%", "86.1%", "112 ms", "Standard Research"),
-        ("InceptionV3 Baseline", "88.2%", "87.4%", "89.1%", "88.2%", "78 ms", "Standard Research")
+        ("Mod-Stem ResNet-50 + LSTM (Proposed)", "91.3%", "91.9%", "90.7%", "0.913", "64 ms", "Hospital / Clinical Diagnostic PACS"),
+        ("DenseNet-121 (Khan et al. [11])", "88.7%", "89.2%", "88.0%", "0.886", "49 ms", "Dense Feature-Reuse Screening"),
+        ("EfficientNet-B0 (Rahman et al. [2])", "87.7%", "88.4%", "86.7%", "0.875", "36 ms", "Compound-Scaled Cloud Clinic"),
+        ("ResNet-50 (Residual Baseline [11, 13])", "87.0%", "87.3%", "86.7%", "0.870", "42 ms", "Standard Deep Residual Research"),
+        ("MobileNet-V2 (Alsaedi et al. [1])", "86.0%", "85.1%", "87.3%", "0.862", "32 ms", "Mobile Phones / Tablet Tele-Triage"),
+        ("ViT-B/16 (Revathi & Arunarani [3])", "78.3%", "77.8%", "79.3%", "0.786", "143 ms", "Vision Transformer Baseline")
     ]
     for row_idx, row_values in enumerate(res_data, start=1):
         for col_idx, val in enumerate(row_values):
@@ -664,11 +666,11 @@ def create_presentation():
             cell.fill.solid()
             cell.fill.fore_color.rgb = WHITE if row_idx % 2 == 1 else LIGHT_BG
             for p in cell.text_frame.paragraphs:
-                p.font.size = Pt(9.5)
+                p.font.size = Pt(8.5)
                 p.font.color.rgb = CHARCOAL
                 if col_idx >= 1:
                     p.alignment = PP_ALIGN.CENTER
-                if row_idx in [1, 2]:
+                if row_idx == 1:
                     p.font.bold = True
 
     # 3 Summary Cards
