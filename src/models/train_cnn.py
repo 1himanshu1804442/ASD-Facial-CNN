@@ -7,6 +7,8 @@ ResNet-50, MobileNet-V2, and Vision Transformer (ViT) on the Zenodo Pediatric AS
 import os
 import sys
 import time
+import copy
+import json
 from pathlib import Path
 from typing import Dict, Any, Tuple
 import torch
@@ -14,6 +16,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
+from sklearn.metrics import roc_auc_score, f1_score
 
 from src.models.cnn_models import (
     build_modstem_resnet50_lstm,
@@ -169,47 +172,74 @@ def evaluate_test_metrics(
     model: nn.Module,
     test_loader: DataLoader,
     device: torch.device
-) -> Dict[str, float]:
+) -> Dict[str, Any]:
     """
     Computes comprehensive clinical metrics on held-out test cohort:
-    Accuracy, Sensitivity (Recall for ASD), Specificity (Recall for Typical), and Precision.
+    Accuracy, Sensitivity, Specificity, Precision, F1-Score, AUROC, and Latency per image.
     """
     model.eval()
     all_preds = []
     all_labels = []
+    all_asd_probs = []
+    start_t = time.perf_counter()
 
     with torch.no_grad():
         for images, labels in test_loader:
             images = images.to(device)
             outputs = model(images)
+            probs = torch.softmax(outputs, dim=-1)
             _, preds = torch.max(outputs, 1)
+
+            # Class 0: autism (ASD)
+            all_asd_probs.extend(probs[:, 0].cpu().numpy().tolist())
             all_preds.extend(preds.cpu().numpy().tolist())
             all_labels.extend(labels.numpy().tolist())
 
-    tp = sum(1 for p, y in zip(all_preds, all_labels) if p == 0 and y == 0)  # Class 0: ASD
-    fn = sum(1 for p, y in zip(all_preds, all_labels) if p == 1 and y == 0)
-    tn = sum(1 for p, y in zip(all_preds, all_labels) if p == 1 and y == 1)  # Class 1: Typical
-    fp = sum(1 for p, y in zip(all_preds, all_labels) if p == 0 and y == 1)
-
+    total_time_ms = (time.perf_counter() - start_t) * 1000.0
     total = len(all_labels)
+    latency_per_img_ms = round(total_time_ms / max(total, 1), 2)
+
+    tp = sum(1 for p, y in zip(all_preds, all_labels) if p == 0 and y == 0)  # ASD true positive
+    fn = sum(1 for p, y in zip(all_preds, all_labels) if p == 1 and y == 0)  # ASD false negative
+    tn = sum(1 for p, y in zip(all_preds, all_labels) if p == 1 and y == 1)  # Typical true negative
+    fp = sum(1 for p, y in zip(all_preds, all_labels) if p == 0 and y == 1)  # Typical false positive
+
     acc = (tp + tn) / total if total > 0 else 0.0
     sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0.0
     specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    f1 = (2 * precision * sensitivity) / (precision + sensitivity) if (precision + sensitivity) > 0 else 0.0
+
+    # Binary ground truth where 1 = ASD (index 0 in ImageFolder)
+    y_true_asd = [1 if y == 0 else 0 for y in all_labels]
+    try:
+        auc_roc = float(roc_auc_score(y_true_asd, all_asd_probs)) if len(set(y_true_asd)) > 1 else 0.0
+    except Exception:
+        auc_roc = 0.0
 
     metrics = {
-        "test_accuracy": round(acc * 100.0, 2),
-        "sensitivity": round(sensitivity * 100.0, 2),
-        "specificity": round(specificity * 100.0, 2),
-        "precision": round(precision * 100.0, 2),
-        "total_evaluated": total,
+        "accuracy": round(acc, 4),
+        "sensitivity": round(sensitivity, 4),
+        "specificity": round(specificity, 4),
+        "precision": round(precision, 4),
+        "f1_score": round(f1, 4),
+        "auc_roc": round(auc_roc, 4),
+        "inference_latency_ms": latency_per_img_ms,
+        "true_positives": tp,
+        "true_negatives": tn,
+        "false_positives": fp,
+        "false_negatives": fn,
+        "samples_evaluated": total,
     }
     logger.info(
         f"Test Benchmark Evaluation:\n"
-        f"  - Accuracy:    {metrics['test_accuracy']}%\n"
-        f"  - Sensitivity: {metrics['sensitivity']}%\n"
-        f"  - Specificity: {metrics['specificity']}%\n"
-        f"  - Precision:   {metrics['precision']}%"
+        f"  - Accuracy:    {metrics['accuracy'] * 100:.2f}%\n"
+        f"  - Sensitivity: {metrics['sensitivity'] * 100:.2f}%\n"
+        f"  - Specificity: {metrics['specificity'] * 100:.2f}%\n"
+        f"  - Precision:   {metrics['precision'] * 100:.2f}%\n"
+        f"  - F1-Score:    {metrics['f1_score'] * 100:.2f}%\n"
+        f"  - AUROC:       {metrics['auc_roc'] * 100:.2f}%\n"
+        f"  - Latency:     {metrics['inference_latency_ms']} ms/image"
     )
     return metrics
 
@@ -273,10 +303,10 @@ def train_and_export_cnn(
             f"Val Loss: {val_loss:.4f} - Val Acc: {val_acc * 100:.2f}%"
         )
 
-        # Track best weights based on validation accuracy
+        # Track best weights based on validation accuracy (deep copy to avoid shallow reference mutation)
         if val_acc >= best_val_acc:
             best_val_acc = val_acc
-            best_weights = model.state_dict().copy()
+            best_weights = copy.deepcopy(model.state_dict())
 
     total_training_time = time.time() - start_time
     logger.info(f"Completed {epochs} epochs for {model_name} in {total_training_time:.1f}s. Best Val Acc: {best_val_acc * 100:.2f}%")
@@ -296,13 +326,20 @@ def train_and_export_cnn(
 def run_pipeline(
     data_dir_str: str = "data/zenodo/extracted/ASD Data",
     models_dir_str: str = "models",
+    results_dir_str: str = "results",
     epochs: int = 5,
     batch_size: int = 32,
-    lr: float = 1e-4
+    lr: float = 1e-4,
+    train_vit: bool = True
 ):
     """
-    Executes complete training and export pipeline for Mod-Stem ResNet-50 + LSTM,
-    ResNet-50 baseline, and MobileNet-V2.
+    Executes complete training and export pipeline for all 4 candidate architectures:
+    1. Mod-Stem ResNet-50 + LSTM (Proposed Primary Model)
+    2. ResNet-50 (Residual Baseline)
+    3. MobileNet-V2 (Lightweight Triage)
+    4. Vision Transformer ViT-B/16 (High Parameter Benchmark)
+    
+    Saves authentic model weights to models/ and updates results/real_benchmark_metrics.json.
     """
     project_root = Path(__file__).resolve().parent.parent.parent
     data_dir = project_root / data_dir_str if not Path(data_dir_str).is_absolute() else Path(data_dir_str)
@@ -314,9 +351,12 @@ def run_pipeline(
             data_dir = fallback_data
 
     models_dir = project_root / models_dir_str if not Path(models_dir_str).is_absolute() else Path(models_dir_str)
+    results_dir = project_root / results_dir_str if not Path(results_dir_str).is_absolute() else Path(results_dir_str)
+    results_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info(f"Dataset root: {data_dir}")
     logger.info(f"Models directory: {models_dir}")
+    logger.info(f"Results directory: {results_dir}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
@@ -331,6 +371,8 @@ def run_pipeline(
         num_workers=0
     )
 
+    benchmark_results = {}
+
     # 1. Train and save Mod-Stem ResNet-50 + LSTM (Proposed Primary Model)
     modstem_path = models_dir / "modstem_resnet50_lstm_asd.pth"
     modstem_model = train_and_export_cnn(
@@ -342,7 +384,7 @@ def run_pipeline(
         lr=lr,
         device=device
     )
-    evaluate_test_metrics(modstem_model, test_loader, device)
+    benchmark_results["modstem_lstm"] = evaluate_test_metrics(modstem_model, test_loader, device)
 
     # 2. Train and save baseline ResNet-50
     resnet_path = models_dir / "resnet50_asd.pth"
@@ -355,7 +397,7 @@ def run_pipeline(
         lr=lr,
         device=device
     )
-    evaluate_test_metrics(resnet_model, test_loader, device)
+    benchmark_results["resnet50"] = evaluate_test_metrics(resnet_model, test_loader, device)
 
     # 3. Train and save MobileNet-V2
     mobilenet_path = models_dir / "mobilenetv2_asd.pth"
@@ -368,9 +410,29 @@ def run_pipeline(
         lr=lr,
         device=device
     )
-    evaluate_test_metrics(mobilenet_model, test_loader, device)
+    benchmark_results["mobilenet_v2"] = evaluate_test_metrics(mobilenet_model, test_loader, device)
 
-    logger.info("All CNN & Hybrid model weights trained and exported successfully!")
+    # 4. Train and save Vision Transformer (ViT-B/16)
+    if train_vit:
+        vit_path = models_dir / "vit_asd.pth"
+        vit_model = train_and_export_cnn(
+            model_name="vit",
+            train_loader=train_loader,
+            val_loader=val_loader,
+            output_path=vit_path,
+            epochs=epochs,
+            lr=lr,
+            device=device
+        )
+        benchmark_results["vit"] = evaluate_test_metrics(vit_model, test_loader, device)
+
+    # Save real benchmark metrics to JSON file
+    metrics_json_path = results_dir / "real_benchmark_metrics.json"
+    with open(metrics_json_path, "w", encoding="utf-8") as f:
+        json.dump(benchmark_results, f, indent=2)
+
+    logger.info(f"Exported empirical benchmark metrics to: {metrics_json_path}")
+    logger.info("All CNN, Hybrid, and ViT models trained and evaluated successfully!")
 
 
 if __name__ == "__main__":

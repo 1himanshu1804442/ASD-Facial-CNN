@@ -177,15 +177,14 @@ def build_modstem_resnet50_lstm(
     )
 
     if freeze_early:
-        # Freeze lower residual layers to preserve general visual representations
+        # Freeze only layer1; allow layer2, layer3, and layer4 to adapt to ModStem activations
         for param in model.layer1.parameters():
             param.requires_grad = False
-        for param in model.layer2.parameters():
-            param.requires_grad = False
-        for param in model.layer3.parameters():
-            param.requires_grad = False
-        # Train Mod-Stem, Layer 4, Bi-LSTM, and classification head
         for param in model.stem.parameters():
+            param.requires_grad = True
+        for param in model.layer2.parameters():
+            param.requires_grad = True
+        for param in model.layer3.parameters():
             param.requires_grad = True
         for param in model.layer4.parameters():
             param.requires_grad = True
@@ -253,6 +252,10 @@ def build_vit(pretrained: bool = True, num_classes: int = 2) -> nn.Module:
 
     for param in model.parameters():
         param.requires_grad = False
+
+    # Unfreeze the last transformer encoder block for fair fine-tuning (matching layer4 in ResNet)
+    for param in model.encoder.layers[-1].parameters():
+        param.requires_grad = True
 
     in_features = model.heads.head.in_features  # 768
     model.heads.head = nn.Sequential(
