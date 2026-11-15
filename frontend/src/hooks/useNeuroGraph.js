@@ -23,6 +23,8 @@ import {
   createSamplePortraitFile,
   generateImageFallbackResult,
   CANONICAL_68_LANDMARKS,
+  MODEL_METADATA,
+  getModelMetadata,
 } from '../services/facialBiomarkers';
 
 // Fallback patient history dataset used when backend database is in bootstrap state or running offline preview
@@ -292,18 +294,42 @@ export function useNeuroGraph() {
       const startTime = performance.now();
       const data = await predictImageDiagnosis(file, modelType);
       const duration = Math.round(performance.now() - startTime);
+
+      const probAsd =
+        data.asd_probability ?? data.probability_asd ?? data.probabilityAsd ?? 0.5;
+      const probTyp =
+        data.control_probability ?? data.probability_typical ?? data.probabilityTypical ?? (1.0 - probAsd);
+      const isAsdPred =
+        data.predicted_class === 1 ||
+        data.predicted_class === 'ASD' ||
+        data.predictedClass === 1 ||
+        data.predictedClass === 'ASD' ||
+        probAsd >= 0.5;
+
+      const fallbackShape = generateImageFallbackResult(
+        isAsdPred ? 'pediatric_asd' : 'typical_control',
+        file,
+        modelType
+      );
+
+      const meta = getModelMetadata(modelType);
+
       return {
+        ...fallbackShape,
         ...data,
-        inference_latency_ms: data.inference_latency_ms ?? duration,
-        model_backbone:
-          data.model_backbone ??
-          (modelType === 'MobileNet-V2'
-            ? 'MobileNet-V2 (Lightweight Fast Triage)'
-            : modelType === 'ViT-B/16' || modelType === 'vit'
-            ? 'ViT-B/16 (Vision Transformer Comparison)'
-            : modelType === 'ResNet-50'
-            ? 'ResNet-50 (Deep High Precision Baseline)'
-            : 'Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)'),
+        predicted_class: isAsdPred ? 1 : 0,
+        predicted_label: isAsdPred ? 'Autism Spectrum Disorder' : 'Typical Control',
+        asd_probability: probAsd,
+        control_probability: probTyp,
+        confidence_percentage:
+          data.confidence_percentage ?? Math.round(Math.max(probAsd, probTyp) * 1000) / 10,
+        landmarks_68: data.landmarks_68 || data.facial_landmarks || fallbackShape.landmarks_68,
+        gcn_saliency_edges: data.gcn_saliency_edges || fallbackShape.gcn_saliency_edges,
+        gradcam_hotspots: data.gradcam_hotspots || fallbackShape.gradcam_hotspots,
+        biomarkers: data.biomarkers || fallbackShape.biomarkers,
+        inference_latency_ms:
+          data.inference_latency_ms ?? data.inference_time_ms ?? data.inferenceTimeMs ?? duration,
+        model_backbone: data.model_backbone ?? meta.label,
         modelType: modelType,
       };
     },
@@ -319,17 +345,11 @@ export function useNeuroGraph() {
     onError: (error, variables) => {
       console.warn('[useNeuroGraph] Backend image endpoint offline/bootstrap, activating rich clinical fallback:', error);
       const activeModel = variables?.modelType || selectedModelType;
-      const simulatedLatency = activeModel === 'MobileNet-V2' ? 38 : (activeModel === 'ViT-B/16' || activeModel === 'vit' ? 142 : (activeModel === 'ResNet-50' ? 88 : 106));
-      setInferenceLatencyMs(simulatedLatency);
+      const meta = getModelMetadata(activeModel);
+      setInferenceLatencyMs(meta.latency);
       const fallback = generateImageFallbackResult(selectedPortraitPresetId, uploadedImageFile, activeModel);
-      fallback.inference_latency_ms = simulatedLatency;
-      fallback.model_backbone = activeModel === 'MobileNet-V2'
-        ? 'MobileNet-V2 (Lightweight Fast Triage)'
-        : (activeModel === 'ViT-B/16' || activeModel === 'vit')
-        ? 'ViT-B/16 (Vision Transformer Comparison)'
-        : activeModel === 'ResNet-50'
-        ? 'ResNet-50 (Deep High Precision Baseline)'
-        : 'Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)';
+      fallback.inference_latency_ms = meta.latency;
+      fallback.model_backbone = meta.label;
       setImagePredictionResult(fallback);
       setPredictionResult(fallback);
     },
@@ -341,21 +361,15 @@ export function useNeuroGraph() {
   const handleModelTypeChange = (newModel) => {
     console.info('[useNeuroGraph] Switching CNN backbone model to:', newModel);
     setSelectedModelType(newModel);
-    const latency = newModel === 'MobileNet-V2' ? 38 : (newModel === 'ViT-B/16' || newModel === 'vit' ? 142 : (newModel === 'ResNet-50' ? 88 : 106));
-    setInferenceLatencyMs(latency);
+    const meta = getModelMetadata(newModel);
+    setInferenceLatencyMs(meta.latency);
 
     if (imagePredictionResult) {
       setImagePredictionResult((prev) => ({
         ...prev,
         modelType: newModel,
-        model_backbone: newModel === 'MobileNet-V2'
-          ? 'MobileNet-V2 (Lightweight Fast Triage)'
-          : (newModel === 'ViT-B/16' || newModel === 'vit')
-          ? 'ViT-B/16 (Vision Transformer Comparison)'
-          : newModel === 'ResNet-50'
-          ? 'ResNet-50 (Deep High Precision Baseline)'
-          : 'Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)',
-        inference_latency_ms: latency,
+        model_backbone: meta.label,
+        inference_latency_ms: meta.latency,
       }));
     }
   };

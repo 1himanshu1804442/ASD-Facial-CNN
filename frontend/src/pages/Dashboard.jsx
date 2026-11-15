@@ -80,8 +80,11 @@ export default function Dashboard() {
   const activeResult = imagePredictionResult || predictionResult;
   const isASD =
     activeResult?.predicted_class === 1 ||
+    activeResult?.predicted_class === 'ASD' ||
     activeResult?.predictedClass === 1 ||
-    (activeResult?.predicted_label && activeResult.predicted_label.toLowerCase().includes('autism'));
+    activeResult?.predictedClass === 'ASD' ||
+    (activeResult?.predicted_label && activeResult.predicted_label.toLowerCase().includes('autism')) ||
+    (activeResult?.asd_probability ?? activeResult?.probability_asd ?? activeResult?.probabilityAsd ?? 0) >= 0.5;
 
   return (
     <div

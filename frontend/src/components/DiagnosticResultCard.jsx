@@ -12,6 +12,7 @@ import {
   Activity,
   FileText,
 } from 'lucide-react';
+import { getModelMetadata } from '../services/facialBiomarkers';
 
 /**
  * DiagnosticResultCard Component.
@@ -47,13 +48,16 @@ export default function DiagnosticResultCard({
   // Determine whether the triage outcome is ASD or Typical Control
   const isASD = !isAwaiting && (
     result.predicted_class === 1 ||
+    result.predicted_class === 'ASD' ||
     result.predictedClass === 1 ||
-    (result.predicted_label && result.predicted_label.toLowerCase().includes('autism'))
+    result.predictedClass === 'ASD' ||
+    (result.predicted_label && result.predicted_label.toLowerCase().includes('autism')) ||
+    (result.asd_probability ?? result.probability_asd ?? result.probabilityAsd ?? result.asdProbability ?? 0) >= 0.5
   );
 
   // Extract probability values with safe fallbacks
-  const asdVal = result.asd_probability ?? result.asdProbability ?? (isASD ? 0.918 : 0.084);
-  const controlVal = result.control_probability ?? result.controlProbability ?? (1.0 - asdVal);
+  const asdVal = result.asd_probability ?? result.probability_asd ?? result.probabilityAsd ?? result.asdProbability ?? (isASD ? 0.918 : 0.084);
+  const controlVal = result.control_probability ?? result.probability_typical ?? result.probabilityTypical ?? result.controlProbability ?? (1.0 - asdVal);
 
   const asdPct = (asdVal * 100).toFixed(1);
   const controlPct = (controlVal * 100).toFixed(1);
@@ -68,16 +72,10 @@ export default function DiagnosticResultCard({
   const confidencePct = isAwaiting ? '50.0' : (result.confidence_percentage ?? (isASD ? asdPct : controlPct));
   const subjectId = result.subject_id || result.demographics?.subject_id || 'PATIENT_SAMPLE';
 
-  // Effective model backbone name and latency
-  const effectiveModel = result.model_backbone || (
-    modelType === 'MobileNet-V2'
-      ? 'MobileNet-V2 (Lightweight Fast Triage)'
-      : 'ResNet-50 (Deep High Precision)'
-  );
-
-  const effectiveLatency = result.inference_latency_ms || latencyMs || (
-    modelType === 'MobileNet-V2' ? 38 : 114
-  );
+  // Effective model backbone name and latency via metadata lookup
+  const meta = getModelMetadata(result.modelType || modelType);
+  const effectiveModel = result.model_backbone || meta.label;
+  const effectiveLatency = result.inference_latency_ms || latencyMs || meta.latency;
 
   /**
    * Animated probability bar width state.

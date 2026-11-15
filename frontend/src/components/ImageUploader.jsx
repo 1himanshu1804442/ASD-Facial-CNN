@@ -361,7 +361,97 @@ export default function ImageUploader({
             </span>
           </button>
 
-          {/* Architecture Option 3: MobileNet-V2 (Lightweight Fast Triage) */}
+          {/* Architecture Option 3: DenseNet-121 (Dense Feature Reuse CNN) */}
+          <button
+            type="button"
+            onClick={() => onModelTypeChange && onModelTypeChange('DenseNet-121')}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              padding: '12px 14px',
+              borderRadius: '12px',
+              textAlign: 'left',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              backgroundColor: (selectedModelType === 'DenseNet-121' || selectedModelType === 'densenet121') ? 'rgba(168, 85, 247, 0.22)' : 'rgba(15, 23, 42, 0.65)',
+              border: `1.5px solid ${(selectedModelType === 'DenseNet-121' || selectedModelType === 'densenet121') ? '#c084fc' : 'rgba(255, 255, 255, 0.08)'}`,
+              boxShadow: (selectedModelType === 'DenseNet-121' || selectedModelType === 'densenet121') ? '0 0 16px rgba(168, 85, 247, 0.3)' : 'none',
+            }}
+            className="glass-panel-hover"
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '4px' }}>
+              <span style={{ fontSize: '0.86rem', fontWeight: 700, color: (selectedModelType === 'DenseNet-121' || selectedModelType === 'densenet121') ? '#ffffff' : '#cbd5e1' }}>
+                DenseNet-121
+              </span>
+              <span
+                style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(168, 85, 247, 0.2)',
+                  color: '#c084fc',
+                  border: '1px solid rgba(168, 85, 247, 0.35)',
+                }}
+              >
+                Dense Reuse
+              </span>
+            </div>
+            <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+              Dense Blocks • 7.0M Params
+            </span>
+            <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '3px' }}>
+              Literature [11] Khan et al. (96.0% Acc on pediatric ASD)
+            </span>
+          </button>
+
+          {/* Architecture Option 4: EfficientNet-B0 (Compound Scaled CNN) */}
+          <button
+            type="button"
+            onClick={() => onModelTypeChange && onModelTypeChange('EfficientNet-B0')}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              padding: '12px 14px',
+              borderRadius: '12px',
+              textAlign: 'left',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              backgroundColor: (selectedModelType === 'EfficientNet-B0' || selectedModelType === 'efficientnet_b0') ? 'rgba(6, 182, 212, 0.22)' : 'rgba(15, 23, 42, 0.65)',
+              border: `1.5px solid ${(selectedModelType === 'EfficientNet-B0' || selectedModelType === 'efficientnet_b0') ? '#22d3ee' : 'rgba(255, 255, 255, 0.08)'}`,
+              boxShadow: (selectedModelType === 'EfficientNet-B0' || selectedModelType === 'efficientnet_b0') ? '0 0 16px rgba(6, 182, 212, 0.3)' : 'none',
+            }}
+            className="glass-panel-hover"
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '4px' }}>
+              <span style={{ fontSize: '0.86rem', fontWeight: 700, color: (selectedModelType === 'EfficientNet-B0' || selectedModelType === 'efficientnet_b0') ? '#ffffff' : '#cbd5e1' }}>
+                EfficientNet-B0
+              </span>
+              <span
+                style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(6, 182, 212, 0.2)',
+                  color: '#22d3ee',
+                  border: '1px solid rgba(6, 182, 212, 0.35)',
+                }}
+              >
+                Compound Scaled
+              </span>
+            </div>
+            <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+              MBConv Blocks • 4.0M Params
+            </span>
+            <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '3px' }}>
+              Literature [2] Rahman et al. (96.6% AUC on facial screening)
+            </span>
+          </button>
+
+          {/* Architecture Option 5: MobileNet-V2 (Lightweight Fast Triage) */}
           <button
             type="button"
             onClick={() => onModelTypeChange && onModelTypeChange('MobileNet-V2')}

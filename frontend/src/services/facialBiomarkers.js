@@ -491,26 +491,43 @@ export function createSamplePortraitFile(sampleId) {
 }
 
 /**
+ * Metadata lookup table for all 6 literature-survey justified vision architectures.
+ */
+export const MODEL_METADATA = {
+  'Mod-Stem ResNet-50 + LSTM': { label: 'Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)', latency: 64 },
+  'ResNet-50': { label: 'ResNet-50 (Residual Baseline)', latency: 42 },
+  'DenseNet-121': { label: 'DenseNet-121 (Dense Feature-Reuse CNN)', latency: 49 },
+  'EfficientNet-B0': { label: 'EfficientNet-B0 (Compound Scaled CNN)', latency: 36 },
+  'MobileNet-V2': { label: 'MobileNet-V2 (Lightweight Fast Triage)', latency: 32 },
+  'ViT-B/16': { label: 'ViT-B/16 (Vision Transformer Benchmark)', latency: 143 },
+};
+
+export function getModelMetadata(modelType) {
+  if (!modelType) return MODEL_METADATA['Mod-Stem ResNet-50 + LSTM'];
+  const low = String(modelType).toLowerCase();
+  if (low.includes('mobilenet')) return MODEL_METADATA['MobileNet-V2'];
+  if (low.includes('densenet')) return MODEL_METADATA['DenseNet-121'];
+  if (low.includes('efficientnet') || low.includes('effnet')) return MODEL_METADATA['EfficientNet-B0'];
+  if (low.includes('vit') || low.includes('transformer')) return MODEL_METADATA['ViT-B/16'];
+  if (low.includes('resnet50') || (low.includes('resnet') && !low.includes('modstem') && !low.includes('lstm'))) {
+    return MODEL_METADATA['ResNet-50'];
+  }
+  return MODEL_METADATA['Mod-Stem ResNet-50 + LSTM'];
+}
+
+/**
  * Generates a complete diagnostic inference response for an uploaded or preset portrait.
  * Why: Guarantees full UI functionality and instant visualization even when backend
  * endpoints are in bootstrap mode or running offline.
  * 
  * @param {string} sampleIdOrPreset - Preset ID (e.g., 'pediatric_asd', 'typical_control') or 'custom'.
  * @param {File|null} customFile - User uploaded custom portrait file.
- * @param {string} [modelType='ResNet-50'] - Active CNN backbone architecture ('ResNet-50' or 'MobileNet-V2').
+ * @param {string} [modelType='Mod-Stem ResNet-50 + LSTM'] - Active CNN backbone architecture.
  */
 export function generateImageFallbackResult(sampleIdOrPreset, customFile = null, modelType = 'Mod-Stem ResNet-50 + LSTM') {
-  const isMobileNet = modelType === 'MobileNet-V2';
-  const isViT = modelType === 'ViT-B/16' || modelType === 'vit';
-  const isResNet = modelType === 'ResNet-50';
-  const backboneLabel = isMobileNet
-    ? 'MobileNet-V2 (Lightweight Fast Triage)'
-    : isViT
-    ? 'ViT-B/16 (Vision Transformer Comparison)'
-    : isResNet
-    ? 'ResNet-50 (Deep High Precision Baseline)'
-    : 'Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)';
-  const latencyMs = isMobileNet ? 38 : (isViT ? 142 : (isResNet ? 88 : 106));
+  const meta = getModelMetadata(modelType);
+  const backboneLabel = meta.label;
+  const latencyMs = meta.latency;
 
   // If matched to a preset, use its finely tuned clinical parameters
   const matchedPreset = PRESET_SAMPLE_PORTRAITS.find((s) => s.id === sampleIdOrPreset);

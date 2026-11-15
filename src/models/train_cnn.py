@@ -183,12 +183,14 @@ def evaluate_test_metrics(
     all_preds = []
     all_labels = []
     all_asd_probs = []
-    start_t = time.perf_counter()
+    model_inference_time_ms = 0.0
 
     with torch.no_grad():
         for images, labels in test_loader:
             images = images.to(device)
+            t0 = time.perf_counter()
             outputs = model(images)
+            model_inference_time_ms += (time.perf_counter() - t0) * 1000.0
             probs = torch.softmax(outputs, dim=-1)
             _, preds = torch.max(outputs, 1)
 
@@ -197,9 +199,8 @@ def evaluate_test_metrics(
             all_preds.extend(preds.cpu().numpy().tolist())
             all_labels.extend(labels.numpy().tolist())
 
-    total_time_ms = (time.perf_counter() - start_t) * 1000.0
     total = len(all_labels)
-    latency_per_img_ms = round(total_time_ms / max(total, 1), 2)
+    latency_per_img_ms = round(model_inference_time_ms / max(total, 1), 2)
 
     tp = sum(1 for p, y in zip(all_preds, all_labels) if p == 0 and y == 0)  # ASD true positive
     fn = sum(1 for p, y in zip(all_preds, all_labels) if p == 1 and y == 0)  # ASD false negative
@@ -377,6 +378,26 @@ def run_pipeline(
         num_workers=0
     )
 
+    MODEL_META = {
+        "modstem_lstm": ("Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)", "Proposed Architecture (Yadav et al., 2026)"),
+        "resnet50": ("ResNet-50 (Residual Baseline)", "Khan et al. [11] / Subah et al. [13]"),
+        "densenet121": ("DenseNet-121 (Dense Feature-Reuse CNN)", "Khan et al. [11] (96.0% Acc on ASD)"),
+        "efficientnet_b0": ("EfficientNet-B0 (Compound Scaled CNN)", "Rahman & Subashini [2] (96.6% AUC on Facial Screening)"),
+        "mobilenet_v2": ("MobileNet-V2 (Lightweight Mobile Triage)", "Alsaedi et al. [1] / Kanhirakadavath et al. [7]"),
+        "vit": ("Vision Transformer ViT-B/16 (High Parameter Benchmark)", "Revathi & Arunarani [3] (ViT Attention on ASD)"),
+    }
+
+    def package_metrics(model_key: str, model: nn.Module) -> Dict[str, Any]:
+        arch_title, citation = MODEL_META.get(model_key, (model_key, "Literature Review"))
+        params_m = round(sum(p.numel() for p in model.parameters()) / 1e6, 1)
+        raw_metrics = evaluate_test_metrics(model, test_loader, device)
+        return {
+            "architecture": arch_title,
+            "literature_citation": citation,
+            "parameters_m": params_m,
+            **raw_metrics
+        }
+
     benchmark_results = {}
 
     # 1. Train and save Mod-Stem ResNet-50 + LSTM (Proposed Primary Model)
@@ -390,7 +411,7 @@ def run_pipeline(
         lr=lr,
         device=device
     )
-    benchmark_results["modstem_lstm"] = evaluate_test_metrics(modstem_model, test_loader, device)
+    benchmark_results["modstem_lstm"] = package_metrics("modstem_lstm", modstem_model)
 
     # 2. Train and save baseline ResNet-50
     resnet_path = models_dir / "resnet50_asd.pth"
@@ -403,7 +424,7 @@ def run_pipeline(
         lr=lr,
         device=device
     )
-    benchmark_results["resnet50"] = evaluate_test_metrics(resnet_model, test_loader, device)
+    benchmark_results["resnet50"] = package_metrics("resnet50", resnet_model)
 
     # 3. Train and save DenseNet-121 (Literature Paper [11] Khan et al., 2024)
     densenet_path = models_dir / "densenet121_asd.pth"
@@ -416,7 +437,7 @@ def run_pipeline(
         lr=lr,
         device=device
     )
-    benchmark_results["densenet121"] = evaluate_test_metrics(densenet_model, test_loader, device)
+    benchmark_results["densenet121"] = package_metrics("densenet121", densenet_model)
 
     # 4. Train and save EfficientNet-B0 (Literature Paper [2] Rahman & Subashini, 2022)
     effnet_path = models_dir / "efficientnet_b0_asd.pth"
@@ -429,7 +450,7 @@ def run_pipeline(
         lr=lr,
         device=device
     )
-    benchmark_results["efficientnet_b0"] = evaluate_test_metrics(effnet_model, test_loader, device)
+    benchmark_results["efficientnet_b0"] = package_metrics("efficientnet_b0", effnet_model)
 
     # 5. Train and save MobileNet-V2
     mobilenet_path = models_dir / "mobilenetv2_asd.pth"
@@ -442,7 +463,7 @@ def run_pipeline(
         lr=lr,
         device=device
     )
-    benchmark_results["mobilenet_v2"] = evaluate_test_metrics(mobilenet_model, test_loader, device)
+    benchmark_results["mobilenet_v2"] = package_metrics("mobilenet_v2", mobilenet_model)
 
     # 6. Train and save Vision Transformer (ViT-B/16) (Literature Paper [3] Revathi & Arunarani, 2026)
     if train_vit:
@@ -456,7 +477,7 @@ def run_pipeline(
             lr=lr,
             device=device
         )
-        benchmark_results["vit"] = evaluate_test_metrics(vit_model, test_loader, device)
+        benchmark_results["vit"] = package_metrics("vit", vit_model)
 
     # Save real benchmark metrics to JSON file
     metrics_json_path = results_dir / "real_benchmark_metrics.json"

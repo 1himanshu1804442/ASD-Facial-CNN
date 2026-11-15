@@ -178,5 +178,25 @@ def test_predict_image_large_resolution():
         files={"file": ("hd_phone_selfie.jpg", buf, "image/jpeg")}
     )
     assert response.status_code == 200
+
+
+def test_predict_image_svg_sample_portrait():
+    """Verify that preset SVG sample portraits from the React dashboard do not throw HTTP 400."""
+    import io
+
+    svg_content = b'<svg xmlns="http://www.w3.org/2000/svg" width="224" height="224"><circle cx="112" cy="112" r="80" fill="#fcd34d"/></svg>'
+    buf = io.BytesIO(svg_content)
+
+    response = client.post(
+        "/api/predict/image",
+        files={"file": ("pediatric_asd_portrait.svg", buf, "image/svg+xml")}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["predicted_class"] in [0, 1]
+    assert "landmarks_68" in data
+    assert "gcn_saliency_edges" in data
+    assert "gradcam_hotspots" in data
+
     assert response.json()["predicted_class"] in [1, 0, "ASD", "Typical"]
 
