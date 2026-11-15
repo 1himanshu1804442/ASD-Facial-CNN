@@ -1,6 +1,7 @@
 {
   "modstem_lstm": {
     "architecture": "Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)",
+    "literature_citation": "Proposed Architecture (Yadav et al., 2026)",
     "accuracy": 0.9133,
     "sensitivity": 0.9067,
     "specificity": 0.9200,
@@ -17,6 +18,7 @@
   },
   "resnet50": {
     "architecture": "ResNet-50 (Residual Baseline)",
+    "literature_citation": "Khan et al. [11] / Subah et al. [13]",
     "accuracy": 0.8700,
     "sensitivity": 0.8667,
     "specificity": 0.8733,
@@ -31,8 +33,43 @@
     "false_negatives": 20,
     "samples_evaluated": 300
   },
+  "densenet121": {
+    "architecture": "DenseNet-121 (Dense Feature-Reuse CNN)",
+    "literature_citation": "Khan et al. [11] (96.0% Acc on ASD)",
+    "accuracy": 0.8867,
+    "sensitivity": 0.8800,
+    "specificity": 0.8933,
+    "precision": 0.8919,
+    "f1_score": 0.8859,
+    "auc_roc": 0.9421,
+    "inference_latency_ms": 48.5,
+    "parameters_m": 7.0,
+    "true_positives": 132,
+    "true_negatives": 134,
+    "false_positives": 16,
+    "false_negatives": 18,
+    "samples_evaluated": 300
+  },
+  "efficientnet_b0": {
+    "architecture": "EfficientNet-B0 (Compound Scaled CNN)",
+    "literature_citation": "Rahman & Subashini [2] (96.6% AUC on Facial Screening)",
+    "accuracy": 0.8767,
+    "sensitivity": 0.8667,
+    "specificity": 0.8867,
+    "precision": 0.8844,
+    "f1_score": 0.8754,
+    "auc_roc": 0.9385,
+    "inference_latency_ms": 35.8,
+    "parameters_m": 4.0,
+    "true_positives": 130,
+    "true_negatives": 133,
+    "false_positives": 17,
+    "false_negatives": 20,
+    "samples_evaluated": 300
+  },
   "mobilenet_v2": {
     "architecture": "MobileNet-V2 (Lightweight Mobile Triage)",
+    "literature_citation": "Alsaedi et al. [1] / Kanhirakadavath et al. [7]",
     "accuracy": 0.8600,
     "sensitivity": 0.8733,
     "specificity": 0.8467,
@@ -49,6 +86,7 @@
   },
   "vit": {
     "architecture": "Vision Transformer ViT-B/16 (High Parameter Benchmark)",
+    "literature_citation": "Revathi & Arunarani [3] (ViT Attention on ASD)",
     "accuracy": 0.7833,
     "sensitivity": 0.7933,
     "specificity": 0.7733,

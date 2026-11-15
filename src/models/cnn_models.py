@@ -240,6 +240,57 @@ def build_mobilenet_v2(pretrained: bool = True, num_classes: int = 2) -> nn.Modu
     return model
 
 
+def build_densenet121(pretrained: bool = True, num_classes: int = 2) -> nn.Module:
+    """
+    Constructs a DenseNet-121 transfer learning architecture for ASD detection.
+    Why: Directly justified by Literature Survey Paper [11] (Khan et al., 2024),
+    which demonstrated 96.0% accuracy on pediatric ASD facial biomarkers due to
+    dense feature reuse across facial layers.
+    """
+    weights = models.DenseNet121_Weights.DEFAULT if pretrained else None
+    model = models.densenet121(weights=weights)
+
+    for param in model.parameters():
+        param.requires_grad = False
+
+    # Unfreeze the denseblock4 feature layer for fine-tuning
+    for param in model.features.denseblock4.parameters():
+        param.requires_grad = True
+
+    in_features = model.classifier.in_features  # 1024
+    model.classifier = nn.Sequential(
+        nn.Dropout(p=0.3),
+        nn.Linear(in_features, num_classes)
+    )
+
+    return model
+
+
+def build_efficientnet_b0(pretrained: bool = True, num_classes: int = 2) -> nn.Module:
+    """
+    Constructs an EfficientNet-B0 transfer learning architecture for ASD detection.
+    Why: Directly justified by Literature Survey Paper [2] (Rahman & Subashini, 2022),
+    achieving 96.6% AUC with compound scaling for lightweight, low-FLOP screening.
+    """
+    weights = models.EfficientNet_B0_Weights.DEFAULT if pretrained else None
+    model = models.efficientnet_b0(weights=weights)
+
+    for param in model.parameters():
+        param.requires_grad = False
+
+    # Unfreeze the final convolutional stages for fine-tuning
+    for param in model.features[-2:].parameters():
+        param.requires_grad = True
+
+    in_features = model.classifier[1].in_features  # 1280
+    model.classifier = nn.Sequential(
+        nn.Dropout(p=0.3),
+        nn.Linear(in_features, num_classes)
+    )
+
+    return model
+
+
 def build_vit(pretrained: bool = True, num_classes: int = 2) -> nn.Module:
     """
     Constructs a Vision Transformer (ViT-B/16) transfer learning model.

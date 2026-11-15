@@ -17,6 +17,8 @@ from src.models.facial_gcn import FacialGCN, build_canonical_68_edges, generate_
 from src.models.cnn_models import (
     build_modstem_resnet50_lstm,
     build_resnet50,
+    build_densenet121,
+    build_efficientnet_b0,
     build_mobilenet_v2,
     build_vit,
     get_cnn_transforms,
@@ -157,6 +159,10 @@ def get_cnn_model(model_name: str = "modstem_lstm") -> Tuple[torch.nn.Module, st
     low = model_name.lower()
     if "modstem" in low or "lstm" in low or "hybrid" in low:
         normalized = "modstem_lstm"
+    elif "densenet" in low:
+        normalized = "densenet121"
+    elif "efficientnet" in low or "effnet" in low:
+        normalized = "efficientnet_b0"
     elif "mobilenet" in low:
         normalized = "mobilenet_v2"
     elif "vit" in low or "transformer" in low:
@@ -173,6 +179,12 @@ def get_cnn_model(model_name: str = "modstem_lstm") -> Tuple[torch.nn.Module, st
     if normalized == "modstem_lstm":
         model = build_modstem_resnet50_lstm(pretrained=True, num_classes=2).to(_device)
         weights_file = models_dir / "modstem_resnet50_lstm_asd.pth"
+    elif normalized == "densenet121":
+        model = build_densenet121(pretrained=True, num_classes=2).to(_device)
+        weights_file = models_dir / "densenet121_asd.pth"
+    elif normalized == "efficientnet_b0":
+        model = build_efficientnet_b0(pretrained=True, num_classes=2).to(_device)
+        weights_file = models_dir / "efficientnet_b0_asd.pth"
     elif normalized == "mobilenet_v2":
         model = build_mobilenet_v2(pretrained=True, num_classes=2).to(_device)
         weights_file = models_dir / "mobilenetv2_asd.pth"

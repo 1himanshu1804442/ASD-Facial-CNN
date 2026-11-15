@@ -21,6 +21,8 @@ from sklearn.metrics import roc_auc_score, f1_score
 from src.models.cnn_models import (
     build_modstem_resnet50_lstm,
     build_resnet50,
+    build_densenet121,
+    build_efficientnet_b0,
     build_mobilenet_v2,
     build_vit,
     get_cnn_transforms,
@@ -268,6 +270,10 @@ def train_and_export_cnn(
         model = build_modstem_resnet50_lstm(pretrained=True, num_classes=2)
     elif norm_name in ["resnet50", "resnet_50"]:
         model = build_resnet50(pretrained=True, num_classes=2)
+    elif norm_name in ["densenet121", "densenet_121", "densenet"]:
+        model = build_densenet121(pretrained=True, num_classes=2)
+    elif norm_name in ["efficientnet_b0", "efficientnetb0", "efficientnet"]:
+        model = build_efficientnet_b0(pretrained=True, num_classes=2)
     elif norm_name in ["mobilenet_v2", "mobilenetv2"]:
         model = build_mobilenet_v2(pretrained=True, num_classes=2)
     elif norm_name in ["vit", "vit_b_16", "vision_transformer"]:
@@ -399,7 +405,33 @@ def run_pipeline(
     )
     benchmark_results["resnet50"] = evaluate_test_metrics(resnet_model, test_loader, device)
 
-    # 3. Train and save MobileNet-V2
+    # 3. Train and save DenseNet-121 (Literature Paper [11] Khan et al., 2024)
+    densenet_path = models_dir / "densenet121_asd.pth"
+    densenet_model = train_and_export_cnn(
+        model_name="densenet121",
+        train_loader=train_loader,
+        val_loader=val_loader,
+        output_path=densenet_path,
+        epochs=epochs,
+        lr=lr,
+        device=device
+    )
+    benchmark_results["densenet121"] = evaluate_test_metrics(densenet_model, test_loader, device)
+
+    # 4. Train and save EfficientNet-B0 (Literature Paper [2] Rahman & Subashini, 2022)
+    effnet_path = models_dir / "efficientnet_b0_asd.pth"
+    effnet_model = train_and_export_cnn(
+        model_name="efficientnet_b0",
+        train_loader=train_loader,
+        val_loader=val_loader,
+        output_path=effnet_path,
+        epochs=epochs,
+        lr=lr,
+        device=device
+    )
+    benchmark_results["efficientnet_b0"] = evaluate_test_metrics(effnet_model, test_loader, device)
+
+    # 5. Train and save MobileNet-V2
     mobilenet_path = models_dir / "mobilenetv2_asd.pth"
     mobilenet_model = train_and_export_cnn(
         model_name="mobilenet_v2",
@@ -412,7 +444,7 @@ def run_pipeline(
     )
     benchmark_results["mobilenet_v2"] = evaluate_test_metrics(mobilenet_model, test_loader, device)
 
-    # 4. Train and save Vision Transformer (ViT-B/16)
+    # 6. Train and save Vision Transformer (ViT-B/16) (Literature Paper [3] Revathi & Arunarani, 2026)
     if train_vit:
         vit_path = models_dir / "vit_asd.pth"
         vit_model = train_and_export_cnn(
