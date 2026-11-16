@@ -494,12 +494,12 @@ export function createSamplePortraitFile(sampleId) {
  * Metadata lookup table for all 6 literature-survey justified vision architectures.
  */
 export const MODEL_METADATA = {
-  'Mod-Stem ResNet-50 + LSTM': { label: 'Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)', latency: 64 },
-  'ResNet-50': { label: 'ResNet-50 (Residual Baseline)', latency: 42 },
-  'DenseNet-121': { label: 'DenseNet-121 (Dense Feature-Reuse CNN)', latency: 49 },
-  'EfficientNet-B0': { label: 'EfficientNet-B0 (Compound Scaled CNN)', latency: 36 },
-  'MobileNet-V2': { label: 'MobileNet-V2 (Lightweight Fast Triage)', latency: 32 },
-  'ViT-B/16': { label: 'ViT-B/16 (Vision Transformer Benchmark)', latency: 143 },
+  'Mod-Stem ResNet-50 + LSTM': { label: 'Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)', latency: 91 },
+  'ResNet-50': { label: 'ResNet-50 (Residual Baseline)', latency: 74 },
+  'DenseNet-121': { label: 'DenseNet-121 (Dense Feature-Reuse CNN)', latency: 69 },
+  'EfficientNet-B0': { label: 'EfficientNet-B0 (Compound Scaled CNN)', latency: 29 },
+  'MobileNet-V2': { label: 'MobileNet-V2 (Lightweight Fast Triage)', latency: 24 },
+  'ViT-B/16': { label: 'ViT-B/16 (Vision Transformer Benchmark)', latency: 187 },
 };
 
 export function getModelMetadata(modelType) {
