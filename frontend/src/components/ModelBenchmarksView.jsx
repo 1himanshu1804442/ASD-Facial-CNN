@@ -4,79 +4,79 @@ import { Award, CheckCircle, ExternalLink, Cpu, BarChart3, Database, ShieldAlert
 const BENCHMARKS = [
   {
     model: 'Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)',
-    type: 'Hybrid CNN + Bi-LSTM',
-    dataset: 'Zenodo 15073612 (2,936 Images)',
-    accuracy: '91.3%',
-    f1: '0.913',
-    auroc: '0.958',
-    xai: 'Grad-CAM Heatmap + 68-Landmark GCN',
-    params: '26.8M',
-    latency: '64 ms',
+    type: 'Mod-Stem 3x3 Conv + 7-Tier Bi-LSTM',
+    dataset: 'Zenodo 15073612 (300 Held-Out Cohort)',
+    accuracy: '85.33%',
+    f1: '0.852',
+    auroc: '0.915',
+    xai: 'Topological 68-Landmark Saliency & Heatmaps',
+    params: '25.8M',
+    latency: '91 ms',
     citation: 'Proposed Work (Yadav et al., 2026)',
     highlight: true
   },
   {
+    model: 'ResNet-50 (Residual Baseline)',
+    type: 'Residual 2D Bottleneck CNN',
+    dataset: 'Zenodo 15073612 (300 Held-Out Cohort)',
+    accuracy: '87.00%',
+    f1: '0.872',
+    auroc: '0.941',
+    xai: 'Grad-CAM only (Layer4)',
+    params: '23.5M',
+    latency: '74 ms',
+    citation: 'Khan et al. [11] / Monani et al. [13]',
+    highlight: false
+  },
+  {
+    model: 'MobileNet-V2 (Lightweight Triage)',
+    type: 'Inverted Residual Mobile CNN',
+    dataset: 'Zenodo 15073612 (300 Held-Out Cohort)',
+    accuracy: '86.67%',
+    f1: '0.869',
+    auroc: '0.929',
+    xai: 'Grad-CAM only (Conv2d)',
+    params: '2.2M',
+    latency: '24 ms',
+    citation: 'Beary et al. [1] / Alkahtani et al. [7]',
+    highlight: false
+  },
+  {
     model: 'DenseNet-121 (Dense Feature-Reuse)',
     type: 'Dense Feature Reuse CNN',
-    dataset: 'Zenodo Pediatric Cohort',
-    accuracy: '88.7%',
-    f1: '0.886',
-    auroc: '0.942',
+    dataset: 'Zenodo 15073612 (300 Held-Out Cohort)',
+    accuracy: '85.33%',
+    f1: '0.848',
+    auroc: '0.944',
     xai: 'Grad-CAM only (DenseBlock4)',
     params: '7.0M',
-    latency: '49 ms',
-    citation: 'Khan et al. [11] (96.0% reported)',
+    latency: '69 ms',
+    citation: 'Khan et al. [11]',
     highlight: false
   },
   {
     model: 'EfficientNet-B0 (Compound Scaled)',
     type: 'Compound Scaled CNN',
-    dataset: 'Zenodo Pediatric Cohort',
-    accuracy: '87.7%',
-    f1: '0.875',
-    auroc: '0.939',
+    dataset: 'Zenodo 15073612 (300 Held-Out Cohort)',
+    accuracy: '82.67%',
+    f1: '0.829',
+    auroc: '0.898',
     xai: 'Grad-CAM only (MBConv)',
     params: '4.0M',
-    latency: '36 ms',
-    citation: 'Rahman & Subashini [2] (96.6% AUC)',
-    highlight: false
-  },
-  {
-    model: 'ResNet-50 (Residual Baseline)',
-    type: 'Residual 2D CNN',
-    dataset: 'Zenodo Pediatric Cohort',
-    accuracy: '87.0%',
-    f1: '0.870',
-    auroc: '0.931',
-    xai: 'Grad-CAM only (Layer4)',
-    params: '25.6M',
-    latency: '42 ms',
-    citation: 'Khan et al. [11] / Subah et al. [13]',
-    highlight: false
-  },
-  {
-    model: 'MobileNet-V2 (Lightweight Triage)',
-    type: 'Inverted Residual CNN',
-    dataset: 'Zenodo Pediatric Cohort',
-    accuracy: '86.0%',
-    f1: '0.862',
-    auroc: '0.933',
-    xai: 'Grad-CAM only (Conv2d)',
-    params: '3.5M',
-    latency: '32 ms',
-    citation: 'Alsaedi et al. [1] / Kanhirakadavath [7]',
+    latency: '29 ms',
+    citation: 'Rahman & Subashini [2]',
     highlight: false
   },
   {
     model: 'ViT-B/16 (Vision Transformer)',
-    type: 'Pure Vision Transformer',
-    dataset: 'Zenodo Pediatric Cohort',
-    accuracy: '78.3%',
-    f1: '0.786',
-    auroc: '0.842',
+    type: 'Pure Vision Transformer (Patch 16)',
+    dataset: 'Zenodo 15073612 (300 Held-Out Cohort)',
+    accuracy: '82.33%',
+    f1: '0.840',
+    auroc: '0.933',
     xai: 'Attention Rollout (Patch-level)',
-    params: '86.6M',
-    latency: '143 ms',
+    params: '85.8M',
+    latency: '187 ms',
     citation: 'Revathi & Arunarani [3] (2026)',
     highlight: false
   }
@@ -102,14 +102,14 @@ export default function ModelBenchmarksView() {
           </div>
           <div className="flex items-center gap-3">
             <div className="bg-slate-900/80 border border-slate-700/60 rounded-xl px-4 py-2.5 text-center">
-              <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Parameters</span>
-              <span className="text-xl font-bold text-cyan-400">0.12M</span>
-              <span className="block text-[10px] text-emerald-400 font-medium">99.5% lighter than ViT</span>
+              <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider">MobileNet-V2</span>
+              <span className="text-xl font-bold text-cyan-400">2.2M</span>
+              <span className="block text-[10px] text-emerald-400 font-medium">24 ms Edge Latency</span>
             </div>
             <div className="bg-slate-900/80 border border-slate-700/60 rounded-xl px-4 py-2.5 text-center">
-              <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Best AUROC</span>
-              <span className="text-xl font-bold text-emerald-400">0.942</span>
-              <span className="block text-[10px] text-emerald-400 font-medium">Top Discrimination</span>
+              <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Top AUROC</span>
+              <span className="text-xl font-bold text-emerald-400">0.944</span>
+              <span className="block text-[10px] text-emerald-400 font-medium">DenseNet-121</span>
             </div>
           </div>
         </div>
