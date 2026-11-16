@@ -652,12 +652,12 @@ def create_presentation():
             p.alignment = PP_ALIGN.CENTER
 
     res_data = [
-        ("Mod-Stem ResNet-50 + LSTM (Proposed)", "91.3%", "91.9%", "90.7%", "0.913", "64 ms", "Hospital / Clinical Diagnostic PACS"),
-        ("DenseNet-121 (Khan et al. [11])", "88.7%", "89.2%", "88.0%", "0.886", "49 ms", "Dense Feature-Reuse Screening"),
-        ("EfficientNet-B0 (Rahman et al. [2])", "87.7%", "88.4%", "86.7%", "0.875", "36 ms", "Compound-Scaled Cloud Clinic"),
-        ("ResNet-50 (Residual Baseline [11, 13])", "87.0%", "87.3%", "86.7%", "0.870", "42 ms", "Standard Deep Residual Research"),
-        ("MobileNet-V2 (Alsaedi et al. [1])", "86.0%", "85.1%", "87.3%", "0.862", "32 ms", "Mobile Phones / Tablet Tele-Triage"),
-        ("ViT-B/16 (Revathi & Arunarani [3])", "78.3%", "77.8%", "79.3%", "0.786", "143 ms", "Vision Transformer Baseline")
+        ("Mod-Stem ResNet-50 + LSTM (Proposed)", "85.3%", "84.7%", "86.0%", "0.852", "91 ms", "Hospital / Clinical Diagnostic PACS"),
+        ("ResNet-50 (Residual Baseline [11, 13])", "87.0%", "88.7%", "85.3%", "0.872", "74 ms", "Standard Deep Residual Research"),
+        ("MobileNet-V2 (Alsaedi et al. [1])", "86.7%", "88.7%", "84.7%", "0.869", "24 ms", "Mobile Phones / Tablet Tele-Triage"),
+        ("DenseNet-121 (Khan et al. [11])", "85.3%", "82.0%", "88.7%", "0.848", "69 ms", "Dense Feature-Reuse Screening"),
+        ("EfficientNet-B0 (Rahman et al. [2])", "82.7%", "84.0%", "81.3%", "0.829", "29 ms", "Compound-Scaled Cloud Clinic"),
+        ("ViT-B/16 (Revathi & Arunarani [3])", "82.3%", "92.7%", "72.0%", "0.840", "187 ms", "Vision Transformer Baseline")
     ]
     for row_idx, row_values in enumerate(res_data, start=1):
         for col_idx, val in enumerate(row_values):
