@@ -293,7 +293,7 @@ export default function ImageUploader({
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '4px' }}>
               <span style={{ fontSize: '0.86rem', fontWeight: 700, color: (selectedModelType === 'Mod-Stem ResNet-50 + LSTM' || selectedModelType === 'modstem_lstm') ? '#ffffff' : '#cbd5e1' }}>
-                MOD-STEM + LSTM
+                MOD-STEM RESNET-50 + LSTM
               </span>
               <span
                 style={{
