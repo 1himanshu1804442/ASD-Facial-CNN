@@ -78,13 +78,19 @@ export default function Dashboard() {
   const [dashboardMode, setDashboardMode] = useState('facial_screening');
 
   const activeResult = imagePredictionResult || predictionResult;
-  const isASD =
+  const isAwaiting = Boolean(
+    activeResult?.isAwaitingInference ||
+    activeResult?.predicted_class === null ||
+    activeResult?.predicted_class === undefined
+  );
+  const isASD = !isAwaiting && (
     activeResult?.predicted_class === 1 ||
     activeResult?.predicted_class === 'ASD' ||
     activeResult?.predictedClass === 1 ||
     activeResult?.predictedClass === 'ASD' ||
     (activeResult?.predicted_label && activeResult.predicted_label.toLowerCase().includes('autism')) ||
-    (activeResult?.asd_probability ?? activeResult?.probability_asd ?? activeResult?.probabilityAsd ?? 0) >= 0.5;
+    (activeResult?.asd_probability ?? activeResult?.probability_asd ?? activeResult?.probabilityAsd ?? 0) >= 0.5
+  );
 
   return (
     <div
@@ -255,10 +261,12 @@ export default function Dashboard() {
                     onReset={handleClearImage}
                     onExport={() => window.print()}
                   />
-                  <FacialBiomarkersCard
-                    biomarkers={activeResult.biomarkers}
-                    isASD={isASD}
-                  />
+                  {!isAwaiting && activeResult.biomarkers && (
+                    <FacialBiomarkersCard
+                      biomarkers={activeResult.biomarkers}
+                      isASD={isASD}
+                    />
+                  )}
                 </>
               )}
             </div>

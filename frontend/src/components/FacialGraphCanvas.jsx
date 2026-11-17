@@ -19,6 +19,28 @@ import {
 } from '../services/facialBiomarkers';
 
 /**
+ * Fallback-safe rounded rectangle drawing function.
+ * Why: Older browsers or Node/Jest canvas test environments may lack native 'roundRect'.
+ */
+function safeRoundRect(ctx, x, y, w, h, r = 4) {
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, w, h, r);
+  } else {
+    // Cross-environment bezier path fallback for rounded rectangles
+    const radius = Math.min(r, w / 2, h / 2);
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + w - radius, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+    ctx.lineTo(x + w, y + h - radius);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+    ctx.lineTo(x + radius, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+  }
+}
+
+/**
  * FacialGraphCanvas Component.
  * 
  * Why: Renders the uploaded patient portrait with an interactive, high-DPI
@@ -50,13 +72,58 @@ export default function FacialGraphCanvas({
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
+  // Dedicated image cache state to prevent expensive reloads on mouse hover events
+  const [loadedImage, setLoadedImage] = useState(null);
+  const [imageError, setImageError] = useState(false);
+
   // Use provided landmarks or fallback to canonical 68 landmarks
   const points = landmarks && landmarks.length === 68 ? landmarks : CANONICAL_68_LANDMARKS;
 
   /**
-   * Main render loop for the high-DPI HTML5 Canvas.
-   * Why: Drawing to a unified canvas ensures flawless synchronization between
-   * the base photograph, landmark node glows, and GCN topological vectors.
+   * Effect 1: Image loading and lifecycle management.
+   * Why: Loads the portrait image once when imageUrl changes. Caches the loaded
+   * HTMLImageElement in state so user hover events do NOT re-instantiate Image objects.
+   */
+  useEffect(() => {
+    if (!imageUrl) {
+      setLoadedImage(null);
+      setImageError(false);
+      return;
+    }
+
+    let isSubscribed = true;
+    const img = new Image();
+
+    img.onload = () => {
+      if (!isSubscribed) return;
+      setImageError(false);
+      setLoadedImage(img);
+    };
+
+    img.onerror = () => {
+      if (!isSubscribed) return;
+      console.warn('[FacialGraphCanvas] Failed to decode patient portrait image:', imageUrl);
+      setImageError(true);
+      setLoadedImage(null);
+    };
+
+    img.src = imageUrl;
+
+    // Handle cached image immediately
+    if (img.complete && img.naturalWidth > 0) {
+      setImageError(false);
+      setLoadedImage(img);
+    }
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [imageUrl]);
+
+  /**
+   * Effect 2: Unified Canvas Redraw & Rendering.
+   * Why: Executes synchronously using the cached image, eliminating canvas flickering
+   * and redundant network/blob requests during user mouse interaction.
    */
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -64,28 +131,44 @@ export default function FacialGraphCanvas({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    let isSubscribed = true;
-
-    // Load base portrait image
-    const img = new Image();
-    if (imageUrl) {
-      img.src = imageUrl;
+    if (imageError) {
+      drawErrorPlaceholder(ctx, canvas, 'Unable to decode portrait image');
+      return;
     }
 
-    img.onload = () => {
-      if (!isSubscribed) return;
-      drawCanvas(ctx, canvas, img);
-    };
-
-    // If image fails or isn't loaded yet, draw empty placeholder with grid
     if (!imageUrl) {
       drawPlaceholder(ctx, canvas);
+      return;
     }
 
-    return () => {
-      isSubscribed = false;
-    };
-  }, [imageUrl, points, saliencyEdges, showLandmarkNodes, showSaliencyGraph, showEdgeLabels, showContourMesh, hoveredPoint, hasResult]);
+    if (loadedImage) {
+      drawCanvas(ctx, canvas, loadedImage);
+    }
+  }, [loadedImage, imageError, imageUrl, points, saliencyEdges, showLandmarkNodes, showSaliencyGraph, showEdgeLabels, showContourMesh, hoveredPoint, hasResult]);
+
+  /**
+   * Effect 3: ResizeObserver for responsive canvas DPI adjustment.
+   */
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      if (loadedImage) {
+        drawCanvas(ctx, canvas, loadedImage);
+      } else if (!imageUrl) {
+        drawPlaceholder(ctx, canvas);
+      }
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [loadedImage, imageUrl, points, saliencyEdges, showLandmarkNodes, showSaliencyGraph, showEdgeLabels, showContourMesh, hoveredPoint, hasResult]);
 
   /**
    * Draws the complete composite scene: Portrait, Contour Wireframe, GCN Edges, and 68 Landmarks.
@@ -119,11 +202,18 @@ export default function FacialGraphCanvas({
       ctx.fillRect(0, 0, width, height);
     }
 
-    // Coordinate conversion helper (normalized 0-1 to canvas pixels)
-    const toPx = (pt) => ({
-      x: pt.x * width,
-      y: pt.y * height,
-    });
+    // Coordinate conversion helper with strict boundary and finite number clamping
+    const toPx = (pt) => {
+      if (!pt || typeof pt !== 'object') {
+        return { x: width / 2, y: height / 2 };
+      }
+      const safeX = typeof pt.x === 'number' && !isNaN(pt.x) ? Math.max(0, Math.min(1, pt.x)) : 0.5;
+      const safeY = typeof pt.y === 'number' && !isNaN(pt.y) ? Math.max(0, Math.min(1, pt.y)) : 0.5;
+      return {
+        x: safeX * width,
+        y: safeY * height,
+      };
+    };
 
     // If screening hasn't been executed yet, display clean portrait with an intuitive prompt badge
     if (!hasResult) {
@@ -134,7 +224,7 @@ export default function FacialGraphCanvas({
       const badgeY = height - 56;
       ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
       ctx.beginPath();
-      ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 10);
+      safeRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, 10);
       ctx.fill();
       ctx.strokeStyle = 'rgba(99, 102, 241, 0.45)';
       ctx.lineWidth = 1.2;
@@ -173,13 +263,15 @@ export default function FacialGraphCanvas({
     // 3. Draw GCN Saliency Edges (Attention Graph)
     if (showSaliencyGraph && saliencyEdges && saliencyEdges.length > 0) {
       saliencyEdges.forEach((edge) => {
+        if (!edge) return;
         const src = points[edge.source];
         const tgt = points[edge.target];
         if (!src || !tgt) return;
 
         const p1 = toPx(src);
         const p2 = toPx(tgt);
-        const saliency = edge.saliency != null ? edge.saliency : 0.5;
+        const rawSaliency = typeof edge.saliency === 'number' && !isNaN(edge.saliency) ? edge.saliency : 0.5;
+        const saliency = Math.max(0, Math.min(1, rawSaliency));
 
         // Color coding: High Saliency (>0.8) = Red/Coral, Moderate (0.5-0.8) = Amber, Baseline = Cyan
         let strokeColor = '#38bdf8';
@@ -225,7 +317,7 @@ export default function FacialGraphCanvas({
           ctx.strokeStyle = strokeColor;
           ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.roundRect(midX - badgeWidth / 2, midY - badgeHeight / 2, badgeWidth, badgeHeight, 4);
+          safeRoundRect(ctx, midX - badgeWidth / 2, midY - badgeHeight / 2, badgeWidth, badgeHeight, 4);
           ctx.fill();
           ctx.stroke();
 
@@ -242,6 +334,7 @@ export default function FacialGraphCanvas({
     // 4. Draw 68 Landmark Nodes
     if (showLandmarkNodes) {
       points.forEach((pt) => {
+        if (!pt) return;
         const p = toPx(pt);
         const region = getLandmarkRegion(pt.id);
         const isHovered = hoveredPoint && hoveredPoint.id === pt.id;
@@ -294,6 +387,29 @@ export default function FacialGraphCanvas({
   };
 
   /**
+   * Draws an error placeholder when the image fails to load.
+   */
+  const drawErrorPlaceholder = (ctx, canvas, message) => {
+    const dpr = window.devicePixelRatio || 1;
+    const width = canvas.clientWidth || 500;
+    const height = canvas.clientHeight || 560;
+
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = '#f87171';
+    ctx.font = '600 13px Plus Jakarta Sans, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(message, width / 2, height / 2);
+    ctx.restore();
+  };
+
+  /**
    * Handles mouse movement to detect hovered landmark point for clinical tooltips.
    */
   const handleMouseMove = (e) => {
@@ -310,8 +426,11 @@ export default function FacialGraphCanvas({
     // Detection radius: 10px
     let found = null;
     for (const pt of points) {
-      const px = pt.x * width;
-      const py = pt.y * height;
+      if (!pt) continue;
+      const safeX = typeof pt.x === 'number' && !isNaN(pt.x) ? pt.x : 0.5;
+      const safeY = typeof pt.y === 'number' && !isNaN(pt.y) ? pt.y : 0.5;
+      const px = safeX * width;
+      const py = safeY * height;
       const dist = Math.hypot(mouseX - px, mouseY - py);
       if (dist <= 10) {
         found = pt;

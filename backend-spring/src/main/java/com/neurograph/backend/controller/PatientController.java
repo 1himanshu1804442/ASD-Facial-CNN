@@ -18,7 +18,7 @@ import java.util.List;
  * validating inputs, and delegating business operations to PatientService and DiagnosticReportService.
  */
 @RestController
-@RequestMapping("/api/v1/patients")
+@RequestMapping({"/api/v1/patients", "/api/patients"})
 @RequiredArgsConstructor
 @Slf4j
 public class PatientController {

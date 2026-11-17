@@ -67,39 +67,55 @@ export default function ImageUploader({
         width: img.naturalWidth || 512,
         height: img.naturalHeight || 512,
       });
+      setUploadError(null);
     };
     img.onerror = () => {
-      // In case of SVG data URL rendering or cross-origin restrictions, default to standard dimensions
-      setImageDimensions({ width: 512, height: 512 });
+      // In case of SVG data URL rendering or cross-origin restrictions, check if it's SVG
+      if (imagePreviewUrl.startsWith('data:image/svg+xml')) {
+        setImageDimensions({ width: 512, height: 512 });
+      } else {
+        setImageDimensions(null);
+        setUploadError('Unable to decode image file. The selected portrait may be corrupted or in an unsupported format.');
+      }
     };
     img.src = imagePreviewUrl;
   }, [imagePreviewUrl]);
 
   /**
    * Validates and processes selected files.
-   * Why: Prevents invalid file types or excessively large files (>15MB) from crashing
-   * the multipart transmission or Python CNN inference server.
+   * Why: Prevents invalid file types, 0-byte corrupted files, or excessively large files (>15MB)
+   * from crashing the multipart transmission or Python CNN inference server.
    */
   const processSelectedFile = (file) => {
     setUploadError(null);
     if (!file) return;
 
+    // Check for 0-byte or corrupted empty files
+    if (file.size === 0) {
+      setUploadError('File is empty (0 bytes). Please select a valid portrait image.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     const isValidType =
       ACCEPTED_TYPES.includes(file.type) ||
-      file.name.match(/\.(jpe?g|png|webp|svg)$/i);
+      (file.name && file.name.match(/\.(jpe?g|png|webp|svg)$/i));
 
     if (!isValidType) {
       setUploadError('Invalid format. Please provide a standard JPG, PNG, or WEBP portrait.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
     // 15MB file size limit
     if (file.size > 15 * 1024 * 1024) {
       setUploadError('File exceeds 15 MB limit. Please select an optimized clinical portrait.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
     onImageUpload(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   // Drag-and-drop event handlers
@@ -641,7 +657,10 @@ export default function ImageUploader({
 
               <button
                 type="button"
-                onClick={onClearImage}
+                onClick={() => {
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                  onClearImage();
+                }}
                 style={{
                   padding: '5px 12px',
                   borderRadius: '6px',

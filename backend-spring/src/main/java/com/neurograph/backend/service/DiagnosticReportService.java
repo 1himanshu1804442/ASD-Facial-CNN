@@ -56,6 +56,7 @@ public class DiagnosticReportService {
 
         // Step 2: Call Python AI engine for GAT forward pass + XAI graph saliency
         DiagnosticResponseDTO inferenceResult = inferenceClientService.executeInference(request);
+        inferenceResult.normalizeFields();
 
         // Step 3: Prevent duplicate persistence on rapid page refreshes (within 15 seconds for the same subject)
         List<DiagnosticReport> existingReports = diagnosticReportRepository.findBySubjectIdOrderByCreatedAtDesc(patient.getSubjectId());
@@ -81,11 +82,11 @@ public class DiagnosticReportService {
 
             DiagnosticReport report = DiagnosticReport.builder()
                     .patient(patient)
-                    .predictedClass(inferenceResult.getPredictedClass())
-                    .predictedLabel(inferenceResult.getPredictedLabel())
-                    .asdProbability(inferenceResult.getAsdProbability())
-                    .controlProbability(inferenceResult.getControlProbability())
-                    .confidencePercentage(inferenceResult.getConfidencePercentage())
+                    .predictedClass(inferenceResult.getPredictedClass() != null ? inferenceResult.getPredictedClass() : 0)
+                    .predictedLabel(inferenceResult.getPredictedLabel() != null ? inferenceResult.getPredictedLabel() : "Typical Control")
+                    .asdProbability(inferenceResult.getAsdProbability() != null ? inferenceResult.getAsdProbability() : 0.50)
+                    .controlProbability(inferenceResult.getControlProbability() != null ? inferenceResult.getControlProbability() : 0.50)
+                    .confidencePercentage(inferenceResult.getConfidencePercentage() != null ? inferenceResult.getConfidencePercentage() : 50.0)
                     .saliencyPathwaysJson(pathwaysJson)
                     .networkAttributionJson(networkAttrJson)
                     .biomarkerRoisJson(biomarkerRoisJson)
@@ -127,6 +128,7 @@ public class DiagnosticReportService {
 
         // Step 3: Forward to InferenceClientService.executeImageInference(file, modelType)
         DiagnosticResponseDTO inferenceResult = inferenceClientService.executeImageInference(file, effectiveModel);
+        inferenceResult.normalizeFields();
         inferenceResult.setImageThumbnailBase64(thumbnailBase64);
 
         // Step 4: Ensure Patient record exists and persist DiagnosticReport entity in PostgreSQL / H2
@@ -164,11 +166,11 @@ public class DiagnosticReportService {
 
             DiagnosticReport report = DiagnosticReport.builder()
                     .patient(patient)
-                    .predictedClass(inferenceResult.getPredictedClass())
-                    .predictedLabel(inferenceResult.getPredictedLabel())
-                    .asdProbability(inferenceResult.getAsdProbability())
-                    .controlProbability(inferenceResult.getControlProbability())
-                    .confidencePercentage(inferenceResult.getConfidencePercentage())
+                    .predictedClass(inferenceResult.getPredictedClass() != null ? inferenceResult.getPredictedClass() : 0)
+                    .predictedLabel(inferenceResult.getPredictedLabel() != null ? inferenceResult.getPredictedLabel() : "Typical Control")
+                    .asdProbability(inferenceResult.getAsdProbability() != null ? inferenceResult.getAsdProbability() : 0.50)
+                    .controlProbability(inferenceResult.getControlProbability() != null ? inferenceResult.getControlProbability() : 0.50)
+                    .confidencePercentage(inferenceResult.getConfidencePercentage() != null ? inferenceResult.getConfidencePercentage() : 50.0)
                     .saliencyPathwaysJson(pathwaysJson)
                     .networkAttributionJson(networkAttrJson)
                     .biomarkerRoisJson(biomarkerRoisJson)
@@ -212,6 +214,7 @@ public class DiagnosticReportService {
 
         // Step 3: Call AI Engine / embedded Facial GCN phenotypic engine
         DiagnosticResponseDTO inferenceResult = inferenceClientService.executeImageInference(file, demo);
+        inferenceResult.normalizeFields();
         inferenceResult.setImageThumbnailBase64(thumbnailBase64);
         inferenceResult.setSubjectId(patient.getSubjectId());
         inferenceResult.setAge(patient.getAge());
@@ -228,11 +231,11 @@ public class DiagnosticReportService {
 
             DiagnosticReport report = DiagnosticReport.builder()
                     .patient(patient)
-                    .predictedClass(inferenceResult.getPredictedClass())
-                    .predictedLabel(inferenceResult.getPredictedLabel())
-                    .asdProbability(inferenceResult.getAsdProbability())
-                    .controlProbability(inferenceResult.getControlProbability())
-                    .confidencePercentage(inferenceResult.getConfidencePercentage())
+                    .predictedClass(inferenceResult.getPredictedClass() != null ? inferenceResult.getPredictedClass() : 0)
+                    .predictedLabel(inferenceResult.getPredictedLabel() != null ? inferenceResult.getPredictedLabel() : "Typical Control")
+                    .asdProbability(inferenceResult.getAsdProbability() != null ? inferenceResult.getAsdProbability() : 0.50)
+                    .controlProbability(inferenceResult.getControlProbability() != null ? inferenceResult.getControlProbability() : 0.50)
+                    .confidencePercentage(inferenceResult.getConfidencePercentage() != null ? inferenceResult.getConfidencePercentage() : 50.0)
                     .saliencyPathwaysJson(pathwaysJson)
                     .networkAttributionJson(networkAttrJson)
                     .biomarkerRoisJson(biomarkerRoisJson)
@@ -299,6 +302,35 @@ public class DiagnosticReportService {
             if (contentType == null || contentType.isBlank() || !contentType.toLowerCase().startsWith("image/")) {
                 contentType = "image/jpeg";
             }
+
+            // Downscale high-resolution images to lightweight thumbnails (max 240px) to prevent database bloat
+            try (java.io.InputStream in = file.getInputStream()) {
+                java.awt.image.BufferedImage original = javax.imageio.ImageIO.read(in);
+                if (original != null) {
+                    int maxDim = 240;
+                    int origW = original.getWidth();
+                    int origH = original.getHeight();
+                    if (origW > maxDim || origH > maxDim) {
+                        double scale = Math.min((double) maxDim / origW, (double) maxDim / origH);
+                        int targetW = (int) Math.max(1, Math.round(origW * scale));
+                        int targetH = (int) Math.max(1, Math.round(origH * scale));
+
+                        java.awt.image.BufferedImage scaled = new java.awt.image.BufferedImage(
+                                targetW, targetH, java.awt.image.BufferedImage.TYPE_INT_RGB);
+                        java.awt.Graphics2D g2d = scaled.createGraphics();
+                        g2d.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                        g2d.drawImage(original, 0, 0, targetW, targetH, null);
+                        g2d.dispose();
+
+                        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                        javax.imageio.ImageIO.write(scaled, "jpg", baos);
+                        return "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(baos.toByteArray());
+                    }
+                }
+            } catch (Exception ex) {
+                log.debug("[DiagnosticReportService] ImageIO thumbnail scaling skipped: {}", ex.getMessage());
+            }
+
             return "data:" + contentType + ";base64," + Base64.getEncoder().encodeToString(bytes);
         } catch (Exception e) {
             log.error("[DiagnosticReportService] Error encoding image to base64 thumbnail: {}", e.getMessage(), e);

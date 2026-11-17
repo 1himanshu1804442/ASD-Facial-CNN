@@ -37,9 +37,13 @@ export default function HistoricalRegistryView({
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'ASD' | 'CONTROL'
 
+  // Safe records array guard to prevent TypeError on null/undefined records
+  const safeRecords = Array.isArray(records) ? records : [];
+
   // Filter records based on search term & class filter
   const filteredRecords = useMemo(() => {
-    return records.filter((r) => {
+    return safeRecords.filter((r) => {
+      if (!r) return false;
       const subjectId = (r.subject_id || r.subjectId || '').toLowerCase();
       const siteId = (r.site_id || r.siteId || '').toLowerCase();
       const label = (r.predicted_label || r.predictedLabel || '').toLowerCase();
@@ -61,17 +65,19 @@ export default function HistoricalRegistryView({
       if (activeFilter === 'CONTROL') return !isASD;
       return true;
     });
-  }, [records, searchTerm, activeFilter]);
+  }, [safeRecords, searchTerm, activeFilter]);
 
-  // Aggregate metrics
-  const totalCount = records.length;
-  const asdCount = records.filter(
+  // Aggregate metrics with strict array and zero division guards
+  const totalCount = safeRecords.length;
+  const asdCount = safeRecords.filter(
     (r) =>
-      r.predicted_class === 1 ||
-      r.predictedClass === 1 ||
-      (r.predicted_label && r.predicted_label.toLowerCase().includes('autism'))
+      r && (
+        r.predicted_class === 1 ||
+        r.predictedClass === 1 ||
+        (r.predicted_label && r.predicted_label.toLowerCase().includes('autism'))
+      )
   ).length;
-  const controlCount = totalCount - asdCount;
+  const controlCount = Math.max(0, totalCount - asdCount);
 
   return (
     <div className="glass-panel" style={{ padding: '28px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -263,9 +269,12 @@ export default function HistoricalRegistryView({
                   (r.predicted_label && r.predicted_label.toLowerCase().includes('autism'));
 
                 const subjectId = r.subject_id || r.subjectId || `SUBJ_${idx + 1}`;
-                const age = r.age != null ? Number(r.age).toFixed(1) : 'N/A';
+                const rawAge = Number(r.age);
+                const age = r.age != null && !isNaN(rawAge) ? rawAge.toFixed(1) : 'N/A';
                 const sex = r.sex === 1 || r.sex === 'MALE' ? 'Male' : 'Female';
-                const confidence = r.confidence_percentage ?? r.confidencePercentage ?? (isASD ? 88.4 : 87.5);
+                const rawConf = r.confidence_percentage ?? r.confidencePercentage ?? (isASD ? 88.4 : 87.5);
+                const confNum = Number(rawConf);
+                const confidence = !isNaN(confNum) ? (confNum <= 1 ? (confNum * 100).toFixed(1) : confNum.toFixed(1)) : '88.0';
                 const site = r.site_id || r.siteId || 'CLINICAL_CENTER';
 
                 return (

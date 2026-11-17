@@ -34,9 +34,11 @@ export default function FacialSaliencyList({ edges = [] }) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {edges.map((edge, idx) => {
+          if (!edge) return null;
           const srcRegion = getLandmarkRegion(edge.source);
           const tgtRegion = getLandmarkRegion(edge.target);
-          const saliencyVal = edge.saliency != null ? edge.saliency : 0.5;
+          const rawSaliency = Number(edge.saliency);
+          const saliencyVal = !isNaN(rawSaliency) ? Math.max(0, Math.min(1, rawSaliency)) : 0.5;
           const isHigh = saliencyVal >= 0.8;
           const isMod = saliencyVal >= 0.5 && saliencyVal < 0.8;
 

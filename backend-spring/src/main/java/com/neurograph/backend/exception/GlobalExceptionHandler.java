@@ -150,6 +150,75 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles maximum upload file size exceeded exceptions (e.g. uploaded image > configured limit).
+     */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponseDTO> handleMaxUploadSizeExceededException(
+            org.springframework.web.multipart.MaxUploadSizeExceededException ex,
+            HttpServletRequest request) {
+
+        log.error("Uploaded image payload exceeds maximum allowed limit at URI [{}]: {}",
+                request.getRequestURI(), ex.getMessage(), ex);
+
+        ErrorResponseDTO errorResponse = ErrorResponseDTO.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.PAYLOAD_TOO_LARGE.value())
+                .error(HttpStatus.PAYLOAD_TOO_LARGE.getReasonPhrase())
+                .message("Uploaded portrait image exceeds the maximum permitted file size.")
+                .path(request.getRequestURI())
+                .build();
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.PAYLOAD_TOO_LARGE);
+    }
+
+    /**
+     * Handles database constraint and integrity violations (e.g. duplicate clinical subject IDs).
+     */
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponseDTO> handleDataIntegrityViolationException(
+            org.springframework.dao.DataIntegrityViolationException ex,
+            HttpServletRequest request) {
+
+        log.error("Database constraint integrity violation at URI [{}]: {}",
+                request.getRequestURI(), ex.getMessage(), ex);
+
+        ErrorResponseDTO errorResponse = ErrorResponseDTO.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
+                .message("Database constraint violation. A record with identical clinical constraints already exists.")
+                .path(request.getRequestURI())
+                .build();
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
+
+    /**
+     * Handles downstream FastAPI HTTP errors (4xx/5xx) and connection timeouts.
+     */
+    @ExceptionHandler({
+            org.springframework.web.client.RestClientResponseException.class,
+            org.springframework.web.client.ResourceAccessException.class
+    })
+    public ResponseEntity<ErrorResponseDTO> handleDownstreamClientException(
+            Exception ex,
+            HttpServletRequest request) {
+
+        log.error("Downstream microservice communication failure at URI [{}]: {}",
+                request.getRequestURI(), ex.getMessage(), ex);
+
+        ErrorResponseDTO errorResponse = ErrorResponseDTO.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_GATEWAY.value())
+                .error(HttpStatus.BAD_GATEWAY.getReasonPhrase())
+                .message("Downstream Python ML Engine error: " + ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_GATEWAY);
+    }
+
+    /**
      * Global catch-all handler for unexpected system exceptions.
      * Logs the full stack trace to ensure no failure goes unobserved.
      */

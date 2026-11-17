@@ -37,7 +37,7 @@ public class Patient {
     /**
      * Unique clinical subject identifier (e.g. PATIENT_001, NYU_0050002).
      */
-    @Column(name = "subject_id", nullable = false, unique = true, length = 64)
+    @Column(name = "subject_id", nullable = false, unique = true, length = 255)
     private String subjectId;
 
     /**
@@ -61,7 +61,7 @@ public class Patient {
     /**
      * Clinical acquisition or imaging center identifier (e.g. NYU_CLINIC, STANFORD_MED).
      */
-    @Column(name = "site_id", nullable = false, length = 64)
+    @Column(name = "site_id", nullable = false, length = 255)
     private String siteId;
 
     /**

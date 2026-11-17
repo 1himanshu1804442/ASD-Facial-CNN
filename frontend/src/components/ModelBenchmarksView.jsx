@@ -1,98 +1,43 @@
 import React from 'react';
-import { Award, CheckCircle, ExternalLink, Cpu, BarChart3, Database, ShieldAlert, Sparkles } from 'lucide-react';
+import {
+  Award,
+  CheckCircle,
+  ExternalLink,
+  Cpu,
+  BarChart3,
+  Database,
+  ShieldAlert,
+  Sparkles,
+  ArrowLeft,
+  Scan,
+} from 'lucide-react';
+import ModelMetricsTable, { DEFAULT_BENCHMARK_DATA } from './ModelMetricsTable';
 
-const BENCHMARKS = [
-  {
-    model: 'Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)',
-    type: 'Mod-Stem 3x3 Conv + 7-Tier Bi-LSTM',
-    dataset: 'Zenodo 15073612 (300 Held-Out Cohort)',
-    accuracy: '85.33%',
-    f1: '0.852',
-    auroc: '0.915',
-    xai: 'Topological 68-Landmark Saliency & Heatmaps',
-    params: '25.8M',
-    latency: '91 ms',
-    citation: 'Proposed Work (Yadav et al., 2026)',
-    highlight: true
-  },
-  {
-    model: 'ResNet-50 (Residual Baseline)',
-    type: 'Residual 2D Bottleneck CNN',
-    dataset: 'Zenodo 15073612 (300 Held-Out Cohort)',
-    accuracy: '87.00%',
-    f1: '0.872',
-    auroc: '0.941',
-    xai: 'Grad-CAM only (Layer4)',
-    params: '23.5M',
-    latency: '74 ms',
-    citation: 'Khan et al. [11] / Monani et al. [13]',
-    highlight: false
-  },
-  {
-    model: 'MobileNet-V2 (Lightweight Triage)',
-    type: 'Inverted Residual Mobile CNN',
-    dataset: 'Zenodo 15073612 (300 Held-Out Cohort)',
-    accuracy: '86.67%',
-    f1: '0.869',
-    auroc: '0.929',
-    xai: 'Grad-CAM only (Conv2d)',
-    params: '2.2M',
-    latency: '24 ms',
-    citation: 'Beary et al. [1] / Alkahtani et al. [7]',
-    highlight: false
-  },
-  {
-    model: 'DenseNet-121 (Dense Feature-Reuse)',
-    type: 'Dense Feature Reuse CNN',
-    dataset: 'Zenodo 15073612 (300 Held-Out Cohort)',
-    accuracy: '85.33%',
-    f1: '0.848',
-    auroc: '0.944',
-    xai: 'Grad-CAM only (DenseBlock4)',
-    params: '7.0M',
-    latency: '69 ms',
-    citation: 'Khan et al. [11]',
-    highlight: false
-  },
-  {
-    model: 'EfficientNet-B0 (Compound Scaled)',
-    type: 'Compound Scaled CNN',
-    dataset: 'Zenodo 15073612 (300 Held-Out Cohort)',
-    accuracy: '82.67%',
-    f1: '0.829',
-    auroc: '0.898',
-    xai: 'Grad-CAM only (MBConv)',
-    params: '4.0M',
-    latency: '29 ms',
-    citation: 'Rahman & Subashini [2]',
-    highlight: false
-  },
-  {
-    model: 'ViT-B/16 (Vision Transformer)',
-    type: 'Pure Vision Transformer (Patch 16)',
-    dataset: 'Zenodo 15073612 (300 Held-Out Cohort)',
-    accuracy: '82.33%',
-    f1: '0.840',
-    auroc: '0.933',
-    xai: 'Attention Rollout (Patch-level)',
-    params: '85.8M',
-    latency: '187 ms',
-    citation: 'Revathi & Arunarani [3] (2026)',
-    highlight: false
-  }
-];
-
-export default function ModelBenchmarksView() {
+export default function ModelBenchmarksView({ onSwitchToScreening, benchmarkData = DEFAULT_BENCHMARK_DATA }) {
   return (
     <div className="space-y-8 animate-fadeIn">
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-cyan-950/40 via-blue-950/30 to-indigo-950/40 border border-cyan-500/30 rounded-2xl p-6 relative overflow-hidden backdrop-blur-md">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-semibold tracking-wide uppercase">
-              <Sparkles className="w-3.5 h-3.5" />
-              Empirical Literature Comparison
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-semibold tracking-wide uppercase">
+                <Sparkles className="w-3.5 h-3.5" />
+                Empirical Literature Comparison
+              </div>
+
+              {onSwitchToScreening && (
+                <button
+                  type="button"
+                  onClick={onSwitchToScreening}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/35 text-indigo-300 text-xs font-semibold hover:bg-indigo-500/25 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Return to Facial Screening</span>
+                </button>
+              )}
             </div>
+
             <h2 className="text-2xl font-bold text-white tracking-tight">
               Model Performance & Benchmark Analysis
             </h2>
@@ -115,64 +60,13 @@ export default function ModelBenchmarksView() {
         </div>
       </div>
 
-      {/* Main Benchmark Comparison Table */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-sm">
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
-          <div className="flex items-center gap-3">
-            <BarChart3 className="w-5 h-5 text-cyan-400" />
-            <h3 className="font-semibold text-slate-200">Table 1: Performance Matrix Across Architectures</h3>
-          </div>
-          <span className="text-xs text-slate-400 font-mono">Dataset: Zenodo 15073612 (Piosenka)</span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-slate-800/80 bg-slate-950/60 text-xs text-slate-400 uppercase tracking-wider font-semibold">
-                <th className="py-3.5 px-6">Model & Study</th>
-                <th className="py-3.5 px-4">Architecture</th>
-                <th className="py-3.5 px-4">Parameters</th>
-                <th className="py-3.5 px-4 text-center">Accuracy</th>
-                <th className="py-3.5 px-4 text-center">F1-Score</th>
-                <th className="py-3.5 px-4 text-center">AUROC</th>
-                <th className="py-3.5 px-6">Clinical Interpretability (XAI)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
-              {BENCHMARKS.map((b, idx) => (
-                <tr
-                  key={idx}
-                  className={`transition-colors ${
-                    b.highlight
-                      ? 'bg-cyan-950/30 hover:bg-cyan-950/40 border-l-4 border-l-cyan-500 font-semibold'
-                      : 'hover:bg-slate-800/30'
-                  }`}
-                >
-                  <td className="py-4 px-6 font-sans text-sm font-medium text-slate-200 flex items-center gap-2">
-                    {b.highlight && <Award className="w-4 h-4 text-amber-400 shrink-0" />}
-                    {b.model}
-                  </td>
-                  <td className="py-4 px-4 text-slate-300 font-sans">{b.type}</td>
-                  <td className="py-4 px-4 text-slate-400">{b.params}</td>
-                  <td className="py-4 px-4 text-center text-slate-200 font-bold">
-                    <span className={`px-2.5 py-1 rounded-full ${b.highlight ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-800 text-slate-300'}`}>
-                      {b.accuracy}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4 text-center text-slate-300">{b.f1}</td>
-                  <td className="py-4 px-4 text-center text-emerald-400 font-bold">{b.auroc}</td>
-                  <td className="py-4 px-6 font-sans text-xs text-slate-300">
-                    <span className={`inline-flex items-center gap-1.5 ${b.highlight ? 'text-emerald-300 font-medium' : 'text-slate-400'}`}>
-                      {b.highlight && <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                      {b.xai}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Main Sortable & Division-by-Zero Protected Benchmark Table */}
+      <ModelMetricsTable
+        benchmarkData={benchmarkData}
+        onSelectArchitecture={() => {
+          if (onSwitchToScreening) onSwitchToScreening();
+        }}
+      />
 
       {/* Key Academic Citations & References */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

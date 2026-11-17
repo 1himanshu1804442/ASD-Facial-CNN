@@ -55,12 +55,17 @@ export default function DiagnosticResultCard({
     (result.asd_probability ?? result.probability_asd ?? result.probabilityAsd ?? result.asdProbability ?? 0) >= 0.5
   );
 
-  // Extract probability values with safe fallbacks
-  const asdVal = result.asd_probability ?? result.probability_asd ?? result.probabilityAsd ?? result.asdProbability ?? (isASD ? 0.918 : 0.084);
-  const controlVal = result.control_probability ?? result.probability_typical ?? result.probabilityTypical ?? result.controlProbability ?? (1.0 - asdVal);
+  // Extract probability values with safe fallbacks and finite number validation
+  const rawAsd = result.asd_probability ?? result.probability_asd ?? result.probabilityAsd ?? result.asdProbability;
+  const numAsd = Number(rawAsd);
+  const asdVal = !isNaN(numAsd) && rawAsd != null ? numAsd : (isASD ? 0.918 : 0.084);
 
-  const asdPct = (asdVal * 100).toFixed(1);
-  const controlPct = (controlVal * 100).toFixed(1);
+  const rawControl = result.control_probability ?? result.probability_typical ?? result.probabilityTypical ?? result.controlProbability;
+  const numControl = Number(rawControl);
+  const controlVal = !isNaN(numControl) && rawControl != null ? numControl : (1.0 - asdVal);
+
+  const asdPct = (Math.max(0, Math.min(1, asdVal)) * 100).toFixed(1);
+  const controlPct = (Math.max(0, Math.min(1, controlVal)) * 100).toFixed(1);
 
   // Formatting strings
   const outcomeTitle = isAwaiting

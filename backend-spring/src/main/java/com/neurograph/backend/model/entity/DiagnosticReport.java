@@ -49,7 +49,7 @@ public class DiagnosticReport {
     /**
      * Human-readable diagnostic classification label ("Autism Spectrum Disorder" or "Typical Control").
      */
-    @Column(name = "predicted_label", nullable = false, length = 64)
+    @Column(name = "predicted_label", nullable = false, length = 128)
     private String predictedLabel;
 
     /**

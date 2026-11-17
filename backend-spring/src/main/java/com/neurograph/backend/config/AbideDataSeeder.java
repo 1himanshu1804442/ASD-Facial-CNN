@@ -85,14 +85,19 @@ public class AbideDataSeeder implements ApplicationRunner {
                 if (subjectId.isEmpty() || subjectId.equalsIgnoreCase("no_filename")) continue;
 
                 int dxGroup = Integer.parseInt(parts[dxGroupIdx].trim()); // 1 = ASD, 0 = Control
-                double age = ageIdx != null && parts.length > ageIdx && !parts[ageIdx].trim().isEmpty()
+                double rawAge = ageIdx != null && parts.length > ageIdx && !parts[ageIdx].trim().isEmpty()
                         ? Double.parseDouble(parts[ageIdx].trim()) : 12.0;
+                double age = (rawAge >= 1.0 && rawAge <= 90.0) ? rawAge : 12.0;
+
                 int rawSex = sexIdx != null && parts.length > sexIdx && !parts[sexIdx].trim().isEmpty()
                         ? Integer.parseInt(parts[sexIdx].trim()) : 1;
                 // Standardize sex: 1 = Male, 0 = Female (ABIDE raw uses 1=Male, 2=Female)
                 int sex = (rawSex == 2 || rawSex == 0) ? 0 : 1;
-                double fiq = fiqIdx != null && parts.length > fiqIdx && !parts[fiqIdx].trim().isEmpty()
+
+                double rawFiq = fiqIdx != null && parts.length > fiqIdx && !parts[fiqIdx].trim().isEmpty()
                         ? Double.parseDouble(parts[fiqIdx].trim()) : 100.0;
+                // Sanitize ABIDE missing data sentinels (-9999) to standardized mean IQ (100.0)
+                double fiq = (rawFiq >= 40.0 && rawFiq <= 160.0) ? rawFiq : 100.0;
                 String siteId = siteIdx != null && parts.length > siteIdx && !parts[siteIdx].trim().isEmpty()
                         ? parts[siteIdx].trim() : "ABIDE_CENTER";
 

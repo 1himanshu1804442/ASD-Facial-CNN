@@ -197,6 +197,88 @@ def test_predict_image_svg_sample_portrait():
     assert "landmarks_68" in data
     assert "gcn_saliency_edges" in data
     assert "gradcam_hotspots" in data
-
     assert response.json()["predicted_class"] in [1, 0, "ASD", "Typical"]
+
+
+def test_v1_health_and_image_endpoints():
+    """Verify that both /api/v1/health and /api/v1/predict/image route cleanly."""
+    import io
+    from PIL import Image
+
+    resp_h = client.get("/api/v1/health")
+    assert resp_h.status_code == 200
+    assert resp_h.json()["status"] == "healthy"
+
+    img = Image.new("RGB", (224, 224), color=(200, 150, 100))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    buf.seek(0)
+
+    resp_img = client.post(
+        "/api/v1/predict/image",
+        files={"file": ("test_portrait.jpg", buf, "image/jpeg")}
+    )
+    assert resp_img.status_code == 200
+    assert resp_img.json()["predicted_class"] in [0, 1]
+
+
+def test_models_benchmark_endpoint():
+    """Verify that /api/v1/models/benchmark returns empirical literature metrics for all 6 backbones."""
+    resp = client.get("/api/v1/models/benchmark")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "success"
+    assert "models" in data
+    models_dict = data["models"]
+    for arch in ["modstem_lstm", "resnet50", "densenet121", "efficientnet_b0", "mobilenet_v2", "vit"]:
+        assert arch in models_dict
+        assert "accuracy" in models_dict[arch]
+        assert "latency" in str(models_dict[arch]).lower() or "inference_latency_ms" in models_dict[arch]
+
+
+def test_predict_demo_endpoint():
+    """Verify rapid 1-click preset demo endpoint for both ASD and Control cases."""
+    # GET ASD case
+    resp_asd = client.get("/api/v1/predict/demo?case=asd&model_type=modstem_lstm")
+    assert resp_asd.status_code == 200
+    d_asd = resp_asd.json()
+    assert d_asd["predicted_class"] == 1
+    assert d_asd["predicted_label"] == "Autism Spectrum Disorder"
+    assert len(d_asd["landmarks_68"]) == 68
+
+    # GET Control case
+    resp_ctrl = client.get("/api/v1/predict/demo?case=control&model_type=mobilenet_v2")
+    assert resp_ctrl.status_code == 200
+    d_ctrl = resp_ctrl.json()
+    assert d_ctrl["predicted_class"] == 0
+    assert d_ctrl["predicted_label"] == "Typical Control"
+
+    # POST demo
+    resp_post = client.post("/api/v1/predict/demo", data={"case": "asd"})
+    assert resp_post.status_code == 200
+
+
+def test_detect_and_crop_face_edge_cases():
+    """Unit test verify detect_and_crop_face against boundary conditions, mode conversions, and zero crops."""
+    from PIL import Image
+    from src.api.server import detect_and_crop_face
+
+    # 1. Non-RGB image modes (RGBA, Grayscale L, 1-bit, CMYK)
+    for mode, color in [("RGBA", (120, 150, 200, 255)), ("L", 128), ("1", 1), ("CMYK", (0, 100, 100, 0))]:
+        im = Image.new(mode, (120, 120), color=color)
+        cx, cy, fw, fh, cr = detect_and_crop_face(im)
+        assert cr.mode == "RGB", f"Expected RGB output for mode {mode}, got {cr.mode}"
+        assert cr.size[0] > 0 and cr.size[1] > 0
+        assert 0.0 <= cx <= 1.0 and 0.0 <= cy <= 1.0
+
+    # 2. None input handling
+    cx, cy, fw, fh, cr = detect_and_crop_face(None)
+    assert cr is not None
+    assert cr.mode == "RGB"
+
+    # 3. Tiny input image (1x1)
+    tiny = Image.new("RGB", (1, 1), color=(100, 100, 100))
+    cx, cy, fw, fh, cr = detect_and_crop_face(tiny)
+    assert cr.size == (1, 1)
+
 

@@ -11,6 +11,14 @@ import {
   ZoomIn,
 } from 'lucide-react';
 
+// Default static hotspots outside component to preserve stable reference across renders
+const DEFAULT_GRADCAM_HOTSPOTS = [
+  { x: 0.50, y: 0.37, radius: 0.22, intensity: 0.96, name: 'Periorbital Core' },
+  { x: 0.37, y: 0.38, radius: 0.14, intensity: 0.91, name: 'Right Gaze Focus' },
+  { x: 0.63, y: 0.38, radius: 0.14, intensity: 0.89, name: 'Left Gaze Focus' },
+  { x: 0.50, y: 0.61, radius: 0.13, intensity: 0.82, name: 'Philtrum Dysmorphology' },
+];
+
 /**
  * GradCamViewer Component.
  * 
@@ -41,18 +49,16 @@ export default function GradCamViewer({
   // Opacity slider value: 0 to 100
   const [opacity, setOpacity] = useState(70);
 
-  // Default fallback hotspots if none provided
-  const activeHotspots = hotspots && hotspots.length > 0 ? hotspots : [
-    { x: 0.50, y: 0.37, radius: 0.22, intensity: 0.96, name: 'Periorbital Core' },
-    { x: 0.37, y: 0.38, radius: 0.14, intensity: 0.91, name: 'Right Gaze Focus' },
-    { x: 0.63, y: 0.38, radius: 0.14, intensity: 0.89, name: 'Left Gaze Focus' },
-    { x: 0.50, y: 0.61, radius: 0.13, intensity: 0.82, name: 'Philtrum Dysmorphology' },
-  ];
+  // Default fallback hotspots with stable memory reference
+  const activeHotspots = hotspots && hotspots.length > 0 ? hotspots : DEFAULT_GRADCAM_HOTSPOTS;
 
   /**
    * Renders thermal class-activation heatmap on target canvas.
    * Why: Synthesizes high-resolution radial thermal distributions approximating
    * gradient backpropagation maps from convolutional and GCN feature maps.
+   * 
+   * Includes strict null-safety and finite-number validation to prevent
+   * 'IndexSizeError' or 'The provided float value is non-finite' canvas crashes.
    */
   const renderHeatmap = (canvas, applyOpacity = true) => {
     if (!canvas) return;
@@ -75,26 +81,39 @@ export default function GradCamViewer({
     // Apply global blend opacity
     ctx.globalAlpha = applyOpacity ? opacity / 100 : 1.0;
 
-    // Draw individual thermal Gaussian kernels
+    // Draw individual thermal Gaussian kernels with strict parameter sanitization
     activeHotspots.forEach((spot) => {
-      const cx = spot.x * width;
-      const cy = spot.y * height;
-      const r = spot.radius * Math.min(width, height);
-      const intensity = spot.intensity || 0.8;
+      if (!spot || typeof spot !== 'object') return;
 
-      const radGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      // Thermal Colormap: Hot Crimson -> Red -> Orange -> Amber -> Green -> Cyan -> Transparent Blue
-      radGrad.addColorStop(0, `rgba(225, 29, 72, ${intensity * 0.95})`);   // Hot Red Core
-      radGrad.addColorStop(0.25, `rgba(249, 115, 22, ${intensity * 0.85})`); // Orange
-      radGrad.addColorStop(0.50, `rgba(234, 179, 8, ${intensity * 0.70})`);  // Yellow
-      radGrad.addColorStop(0.70, `rgba(16, 185, 129, ${intensity * 0.45})`); // Green
-      radGrad.addColorStop(0.88, `rgba(6, 182, 212, ${intensity * 0.20})`);  // Cyan
-      radGrad.addColorStop(1.0, 'rgba(30, 58, 138, 0.0)');                   // Transparent Edge
+      // Ensure coordinate floats are finite numbers within normalized [0, 1] bounds
+      const rawX = typeof spot.x === 'number' && !isNaN(spot.x) ? spot.x : 0.5;
+      const rawY = typeof spot.y === 'number' && !isNaN(spot.y) ? spot.y : 0.5;
+      const spotRadius = typeof spot.radius === 'number' && !isNaN(spot.radius) && spot.radius > 0 ? spot.radius : 0.15;
+      const rawIntensity = typeof spot.intensity === 'number' && !isNaN(spot.intensity) ? spot.intensity : 0.8;
 
-      ctx.fillStyle = radGrad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fill();
+      const cx = Math.max(0, Math.min(width, rawX * width));
+      const cy = Math.max(0, Math.min(height, rawY * height));
+      // Radius must strictly be greater than zero to prevent IndexSizeError in createRadialGradient
+      const r = Math.max(1, spotRadius * Math.min(width, height));
+      const intensity = Math.max(0, Math.min(1, rawIntensity));
+
+      try {
+        const radGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        // Thermal Colormap: Hot Crimson -> Red -> Orange -> Amber -> Green -> Cyan -> Transparent Blue
+        radGrad.addColorStop(0, `rgba(225, 29, 72, ${intensity * 0.95})`);   // Hot Red Core
+        radGrad.addColorStop(0.25, `rgba(249, 115, 22, ${intensity * 0.85})`); // Orange
+        radGrad.addColorStop(0.50, `rgba(234, 179, 8, ${intensity * 0.70})`);  // Yellow
+        radGrad.addColorStop(0.70, `rgba(16, 185, 129, ${intensity * 0.45})`); // Green
+        radGrad.addColorStop(0.88, `rgba(6, 182, 212, ${intensity * 0.20})`);  // Cyan
+        radGrad.addColorStop(1.0, 'rgba(30, 58, 138, 0.0)');                   // Transparent Edge
+
+        ctx.fillStyle = radGrad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+      } catch (err) {
+        console.warn('[GradCamViewer] Gradient kernel rendering skipped for invalid hotspot:', spot, err);
+      }
     });
 
     ctx.restore();

@@ -18,7 +18,7 @@ import java.util.Map;
  * Why: Provides a unified health probe for Docker, Kubernetes, and the React clinician header.
  */
 @RestController
-@RequestMapping("/api/v1/health")
+@RequestMapping({"/api/v1/health", "/api/health"})
 @RequiredArgsConstructor
 @Slf4j
 public class HealthController {

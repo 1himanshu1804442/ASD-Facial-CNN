@@ -195,9 +195,9 @@ def evaluate_test_metrics(
             _, preds = torch.max(outputs, 1)
 
             # Class 0: autism (ASD)
-            all_asd_probs.extend(probs[:, 0].cpu().numpy().tolist())
-            all_preds.extend(preds.cpu().numpy().tolist())
-            all_labels.extend(labels.numpy().tolist())
+            all_asd_probs.extend(probs[:, 0].cpu().tolist())
+            all_preds.extend(preds.cpu().tolist())
+            all_labels.extend(labels.cpu().tolist())
 
     total = len(all_labels)
     latency_per_img_ms = round(model_inference_time_ms / max(total, 1), 2)

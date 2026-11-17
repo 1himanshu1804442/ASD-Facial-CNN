@@ -147,7 +147,7 @@ class ModStemResNet50LSTM(nn.Module):
 
         # Extract 7 vertical anatomical facial regions
         x = self.region_pool(x)  # (B, 2048, 7, 1)
-        x = x.squeeze(-1).permute(0, 2, 1)  # (B, 7, 2048) -> Sequence of 7 tokens
+        x = x.squeeze(-1).permute(0, 2, 1).contiguous()  # (B, 7, 2048) -> Sequence of 7 tokens in contiguous memory
 
         # Process sequential morphological relationships via Bi-LSTM
         lstm_out, _ = self.lstm(x)  # (B, 7, 256)

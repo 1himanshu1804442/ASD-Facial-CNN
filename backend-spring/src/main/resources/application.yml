@@ -18,6 +18,11 @@ spring:
       max-lifetime: 2000000
       connection-timeout: 30000
 
+  # Jackson JSON configuration
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: false
+
   # Spring Data JPA configuration
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect

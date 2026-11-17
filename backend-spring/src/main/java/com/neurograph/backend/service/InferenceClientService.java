@@ -100,6 +100,7 @@ public class InferenceClientService {
                     .retrieve()
                     .body(SampleCasesResponseDTO.class);
         } catch (Exception e) {
+            log.warn("[InferenceClientService] Python AI Engine sample cases endpoint unreachable (/api/samples): {}. Using default cohort samples.", e.getMessage());
             return generateDefaultSampleCases();
         }
     }
@@ -134,6 +135,7 @@ public class InferenceClientService {
             return calculateDynamicInference(request);
 
         } catch (Exception e) {
+            log.warn("[InferenceClientService] Python AI Engine inference endpoint unreachable or failed: {}. Executing dynamic phenotypic calculation fallback.", e.getMessage(), e);
             return calculateDynamicInference(request);
         }
     }
@@ -195,7 +197,10 @@ public class InferenceClientService {
                     .retrieve()
                     .body(DiagnosticResponseDTO.class);
 
-            if (response != null && (response.getAsdProbability() != null || response.getPredictedLabel() != null)) {
+            if (response != null && (response.getAsdProbability() != null || response.getPredictedLabel() != null || response.getProbabilityAsd() != null)) {
+                // Ensure all fields (probabilities, confidence percentages, labels) are properly mapped
+                response.normalizeFields();
+
                 log.info("[InferenceClientService] Python FastAPI image inference succeeded for model '{}': {} (Confidence: {}%)",
                         effectiveModel, response.getPredictedLabel(), response.getConfidencePercentage());
 

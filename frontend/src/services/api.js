@@ -12,6 +12,34 @@ const API_BASE_URL =
   (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
   '/api';
 
+// Standard network request timeout (25 seconds) to prevent infinite UI loading hangs
+const DEFAULT_REQUEST_TIMEOUT_MS = 25000;
+
+/**
+ * Executes a fetch request with an AbortController timeout.
+ * Why: Prevents the UI from remaining stuck in an indefinite 'isPending' loading state
+ * if the Spring Boot gateway or PyTorch Python worker is slow or unresponsive.
+ */
+async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeoutMs / 1000}s. Spring Boot backend may be overloaded or offline.`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Checks system health, Spring Boot service status, and GAT model readiness.
  * Target Endpoint: GET /api/v1/health
@@ -20,7 +48,7 @@ const API_BASE_URL =
  */
 export async function checkHealth() {
   try {
-    const response = await fetch(`${API_BASE_URL}/v1/health`);
+    const response = await fetchWithTimeout(`${API_BASE_URL}/v1/health`, {}, 8000);
     if (!response.ok) {
       throw new Error(`Health check HTTP error! status: ${response.status}`);
     }
@@ -40,7 +68,7 @@ export async function checkHealth() {
  */
 export async function fetchSampleCases() {
   try {
-    const response = await fetch(`${API_BASE_URL}/v1/samples`);
+    const response = await fetchWithTimeout(`${API_BASE_URL}/v1/samples`);
     if (!response.ok) {
       throw new Error(`Fetch samples HTTP error! status: ${response.status}`);
     }
@@ -67,7 +95,7 @@ export async function predictDiagnosis(payload) {
       payload?.demographics?.subject_id || 'Unknown'
     );
 
-    const response = await fetch(`${API_BASE_URL}/v1/predict`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/v1/predict`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -102,7 +130,7 @@ export async function predictDiagnosis(payload) {
 export async function fetchPatientHistory() {
   try {
     console.info('[NeuroGraph API] Fetching historical patient records from PostgreSQL...');
-    const response = await fetch(`${API_BASE_URL}/v1/patients`);
+    const response = await fetchWithTimeout(`${API_BASE_URL}/v1/patients`);
 
     if (!response.ok) {
       throw new Error(`Fetch patient history HTTP error! status: ${response.status}`);
@@ -131,7 +159,7 @@ export async function fetchPatientHistory() {
 export async function fetchDiagnosticReports() {
   try {
     console.info('[NeuroGraph API] Fetching diagnostic reports from PostgreSQL...');
-    const response = await fetch(`${API_BASE_URL}/v1/reports`);
+    const response = await fetchWithTimeout(`${API_BASE_URL}/v1/reports`);
 
     if (!response.ok) {
       throw new Error(`Fetch diagnostic reports HTTP error! status: ${response.status}`);
@@ -159,7 +187,7 @@ export async function fetchDiagnosticReports() {
 export async function clearAllDiagnosticReports() {
   try {
     console.info('[NeuroGraph API] Requesting deletion of historical diagnostic reports...');
-    const response = await fetch(`${API_BASE_URL}/v1/reports`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/v1/reports`, {
       method: 'DELETE',
     });
     if (!response.ok) {
@@ -181,7 +209,7 @@ export async function clearAllDiagnosticReports() {
 export async function seedAbideCohortApi() {
   try {
     console.info('[NeuroGraph API] Requesting seed of 100 ABIDE I cohort subjects...');
-    const response = await fetch(`${API_BASE_URL}/v1/reports/seed`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/v1/reports/seed`, {
       method: 'POST',
     });
     if (!response.ok) {
@@ -230,11 +258,15 @@ export async function predictImageDiagnosis(file, modelType = 'ResNet-50') {
       `[NeuroGraph API] Submitting facial portrait to /v1/predict/image with modelType: ${modelType}...`
     );
 
-    const response = await fetch(`${API_BASE_URL}/v1/predict/image?modelType=${encodeURIComponent(modelType)}`, {
-      method: 'POST',
-      // Note: Do NOT set 'Content-Type' header here; fetch sets boundary automatically for FormData
-      body: formData,
-    });
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}/v1/predict/image?modelType=${encodeURIComponent(modelType)}`,
+      {
+        method: 'POST',
+        // Note: Do NOT set 'Content-Type' header here; fetch sets boundary automatically for FormData
+        body: formData,
+      },
+      30000 // 30s timeout for deep neural network image inference
+    );
 
     if (!response.ok) {
       const errorText = await response.text();

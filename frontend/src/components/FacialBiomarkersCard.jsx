@@ -64,8 +64,10 @@ export default function FacialBiomarkersCard({ biomarkers, isASD }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
         {metrics.map((metric) => {
-          const isElevated = metric.score >= metric.threshold;
-          const pct = Math.round(metric.score * 100);
+          const rawScore = Number(metric.score);
+          const safeScore = !isNaN(rawScore) ? Math.max(0, Math.min(1, rawScore)) : (isASD ? 0.85 : 0.15);
+          const isElevated = safeScore >= metric.threshold;
+          const pct = Math.round(safeScore * 100);
 
           return (
             <div

@@ -23,7 +23,7 @@ import java.util.List;
  * and orchestrating inference through the Service layer.
  */
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping({"/api/v1", "/api"})
 @RequiredArgsConstructor
 @Slf4j
 public class DiagnosticController {
@@ -32,7 +32,7 @@ public class DiagnosticController {
     private final InferenceClientService inferenceClientService;
 
     /**
-     * POST /api/v1/predict
+     * POST /api/v1/predict or /api/predict
      * Executes diagnostic GAT inference, GNNExplainer XAI extraction, and PostgreSQL persistence.
      */
     @PostMapping("/predict")
@@ -44,26 +44,33 @@ public class DiagnosticController {
     }
 
     /**
-     * POST /api/v1/predict/image
+     * POST /api/v1/predict/image or /api/predict/image
      * Executes image-based facial GCN inference, phenotypic landmark extraction, and report persistence.
      * 
-     * Why: Accepts multipart/form-data containing portrait image and model type parameter,
-     * validates input boundaries, and delegates to the Service layer for clinical processing.
+     * Why: Accepts multipart/form-data with either 'file' or 'image' parameter, and either 'modelType'
+     * or 'model_type' parameter for complete compatibility across UI clients and curl/Postman.
      */
     @PostMapping(value = "/predict/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<DiagnosticResponseDTO> predictImageDiagnosis(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "modelType", defaultValue = "resnet50") String modelType) {
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "modelType", required = false) String modelType,
+            @RequestParam(value = "model_type", required = false) String modelTypeSnake) {
+
+        MultipartFile targetFile = (file != null && !file.isEmpty()) ? file : image;
+        String effectiveModel = (modelType != null && !modelType.isBlank())
+                ? modelType
+                : ((modelTypeSnake != null && !modelTypeSnake.isBlank()) ? modelTypeSnake : "resnet50");
 
         log.info("[DiagnosticController] Received multipart image prediction request: modelType={}, fileName={}, size={} bytes",
-                modelType, file != null ? file.getOriginalFilename() : "null", file != null ? file.getSize() : 0);
+                effectiveModel, targetFile != null ? targetFile.getOriginalFilename() : "null", targetFile != null ? targetFile.getSize() : 0);
 
-        if (file == null || file.isEmpty()) {
+        if (targetFile == null || targetFile.isEmpty()) {
             log.error("[DiagnosticController] Uploaded image file is empty or missing.");
             throw new IllegalArgumentException("Image file must not be empty.");
         }
 
-        DiagnosticResponseDTO response = diagnosticReportService.runImageDiagnosticInference(file, modelType);
+        DiagnosticResponseDTO response = diagnosticReportService.runImageDiagnosticInference(targetFile, effectiveModel);
         return ResponseEntity.ok(response);
     }
 
