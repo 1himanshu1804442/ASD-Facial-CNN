@@ -230,7 +230,7 @@ export default function Dashboard() {
         {dashboardMode === 'facial_screening' ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             {/* Left Column: Image Dropzone/Picker + Diagnostic Decision + Dysmorphology Metrics */}
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-6 pt-3">
               {/* Image Uploader & Sample Portrait Picker with Backbone Selector */}
               <ImageUploader
                 uploadedImageFile={uploadedImageFile}

@@ -453,7 +453,36 @@ async def predict_image(
 
     confidence_pct = round(confidence * 100.0, 1)
 
-    # Generate 68 canonical facial landmark coordinates
+    # Dynamic face bounding box estimation for anatomical landmark scaling
+    def estimate_face_bbox(img: Image.Image):
+        try:
+            ycbcr = img.convert("YCbCr")
+            arr = np.array(ycbcr)
+            cb, cr = arr[:, :, 1], arr[:, :, 2]
+            skin = (cb >= 77) & (cb <= 135) & (cr >= 133) & (cr <= 180)
+            rows, cols = np.where(skin)
+            if len(rows) < 80:
+                return 0.50, 0.50, 0.65, 0.70
+            p_rows = np.percentile(rows, [5, 95]) / float(arr.shape[0])
+            p_cols = np.percentile(cols, [5, 95]) / float(arr.shape[1])
+            cx = float((p_cols[0] + p_cols[1]) / 2.0)
+            cy = float((p_rows[0] + p_rows[1]) / 2.0)
+            w = max(0.28, min(0.92, float(p_cols[1] - p_cols[0])))
+            h = max(0.28, min(0.92, float(p_rows[1] - p_rows[0])))
+            return cx, cy, w, h
+        except Exception:
+            return 0.50, 0.50, 0.65, 0.70
+
+    face_cx, face_cy, face_w, face_h = estimate_face_bbox(image)
+    scale_x = face_w / 0.65
+    scale_y = face_h / 0.70
+
+    def fit_pt(rx: float, ry: float):
+        adj_x = face_cx + (rx - 0.50) * scale_x
+        adj_y = face_cy + (ry - 0.50) * scale_y
+        return round(float(min(0.98, max(0.02, adj_x))), 4), round(float(min(0.98, max(0.02, adj_y))), 4)
+
+    # Generate 68 anatomical facial landmark coordinates fitted to the detected face
     landmarks = []
     # Jawline (0-16)
     for i in range(17):
@@ -461,44 +490,67 @@ async def predict_image(
         angle = np.pi * 0.15 + t * np.pi * 0.70
         rx = 0.50 - 0.32 * np.cos(angle)
         ry = 0.35 + 0.50 * np.sin(angle)
-        landmarks.append({"index": i, "id": i, "name": f"Jaw_{i+1}", "x": round(float(rx), 4), "y": round(float(ry), 4), "region": "Jawline"})
+        px, py = fit_pt(rx, ry)
+        landmarks.append({"index": i, "id": i, "name": f"Jaw_{i+1}", "x": px, "y": py, "region": "Jawline"})
 
     # Right Eyebrow (17-21)
     for i in range(5):
         t = i / 4.0
-        landmarks.append({"index": 17 + i, "id": 17 + i, "name": f"Eyebrow_R_{i+1}", "x": round(0.24 + t * 0.16, 4), "y": round(0.28 - 0.03 * np.sin(t * np.pi), 4), "region": "Eyebrow_R"})
+        rx = 0.24 + t * 0.16
+        ry = 0.28 - 0.03 * np.sin(t * np.pi)
+        px, py = fit_pt(rx, ry)
+        landmarks.append({"index": 17 + i, "id": 17 + i, "name": f"Eyebrow_R_{i+1}", "x": px, "y": py, "region": "Eyebrow_R"})
 
     # Left Eyebrow (22-26)
     for i in range(5):
         t = i / 4.0
-        landmarks.append({"index": 22 + i, "id": 22 + i, "name": f"Eyebrow_L_{i+1}", "x": round(0.60 + t * 0.16, 4), "y": round(0.28 - 0.03 * np.sin(t * np.pi), 4), "region": "Eyebrow_L"})
+        rx = 0.60 + t * 0.16
+        ry = 0.28 - 0.03 * np.sin(t * np.pi)
+        px, py = fit_pt(rx, ry)
+        landmarks.append({"index": 22 + i, "id": 22 + i, "name": f"Eyebrow_L_{i+1}", "x": px, "y": py, "region": "Eyebrow_L"})
 
     # Nasal Bridge & Tip (27-35)
     for i in range(4):
-        landmarks.append({"index": 27 + i, "id": 27 + i, "name": f"Nose_Bridge_{i+1}", "x": 0.50, "y": round(0.35 + i * 0.05, 4), "region": "Nose"})
+        px, py = fit_pt(0.50, 0.35 + i * 0.05)
+        landmarks.append({"index": 27 + i, "id": 27 + i, "name": f"Nose_Bridge_{i+1}", "x": px, "y": py, "region": "Nose"})
     for i in range(5):
         t = i / 4.0
-        landmarks.append({"index": 31 + i, "id": 31 + i, "name": f"Nose_Tip_{i+1}", "x": round(0.44 + t * 0.12, 4), "y": round(0.53 + 0.02 * np.sin(t * np.pi), 4), "region": "Nose"})
+        rx = 0.44 + t * 0.12
+        ry = 0.53 + 0.02 * np.sin(t * np.pi)
+        px, py = fit_pt(rx, ry)
+        landmarks.append({"index": 31 + i, "id": 31 + i, "name": f"Nose_Tip_{i+1}", "x": px, "y": py, "region": "Nose"})
 
     # Right Eye (36-41)
     for i in range(6):
         t = i / 6.0 * 2 * np.pi
-        landmarks.append({"index": 36 + i, "id": 36 + i, "name": f"Eye_R_{i+1}", "x": round(0.34 + 0.05 * np.cos(t), 4), "y": round(0.36 + 0.03 * np.sin(t), 4), "region": "Right Eye"})
+        rx = 0.34 + 0.05 * np.cos(t)
+        ry = 0.36 + 0.03 * np.sin(t)
+        px, py = fit_pt(rx, ry)
+        landmarks.append({"index": 36 + i, "id": 36 + i, "name": f"Eye_R_{i+1}", "x": px, "y": py, "region": "Right Eye"})
 
     # Left Eye (42-47)
     for i in range(6):
         t = i / 6.0 * 2 * np.pi
-        landmarks.append({"index": 42 + i, "id": 42 + i, "name": f"Eye_L_{i+1}", "x": round(0.66 + 0.05 * np.cos(t), 4), "y": round(0.36 + 0.03 * np.sin(t), 4), "region": "Left Eye"})
+        rx = 0.66 + 0.05 * np.cos(t)
+        ry = 0.36 + 0.03 * np.sin(t)
+        px, py = fit_pt(rx, ry)
+        landmarks.append({"index": 42 + i, "id": 42 + i, "name": f"Eye_L_{i+1}", "x": px, "y": py, "region": "Left Eye"})
 
     # Outer Mouth (48-59)
     for i in range(12):
         t = i / 12.0 * 2 * np.pi
-        landmarks.append({"index": 48 + i, "id": 48 + i, "name": f"Mouth_Outer_{i+1}", "x": round(0.50 + 0.12 * np.cos(t), 4), "y": round(0.68 + 0.06 * np.sin(t), 4), "region": "Mouth"})
+        rx = 0.50 + 0.12 * np.cos(t)
+        ry = 0.68 + 0.06 * np.sin(t)
+        px, py = fit_pt(rx, ry)
+        landmarks.append({"index": 48 + i, "id": 48 + i, "name": f"Mouth_Outer_{i+1}", "x": px, "y": py, "region": "Mouth"})
 
     # Inner Mouth (60-67)
     for i in range(8):
         t = i / 8.0 * 2 * np.pi
-        landmarks.append({"index": 60 + i, "id": 60 + i, "name": f"Mouth_Inner_{i+1}", "x": round(0.50 + 0.08 * np.cos(t), 4), "y": round(0.68 + 0.03 * np.sin(t), 4), "region": "Mouth"})
+        rx = 0.50 + 0.08 * np.cos(t)
+        ry = 0.68 + 0.03 * np.sin(t)
+        px, py = fit_pt(rx, ry)
+        landmarks.append({"index": 60 + i, "id": 60 + i, "name": f"Mouth_Inner_{i+1}", "x": px, "y": py, "region": "Mouth"})
 
     # Canonical 68 landmarks list formatted for React canvas
     landmarks_68 = [

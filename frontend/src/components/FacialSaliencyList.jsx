@@ -19,11 +19,11 @@ export default function FacialSaliencyList({ edges = [] }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <span style={{ fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase', color: '#818cf8', letterSpacing: '0.05em' }}>
-            Graph Attention Network Edges
+            Craniofacial Landmark Saliency Edges
           </span>
           <h3 style={{ margin: '3px 0 0 0', fontSize: '1.15rem', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <GitCommit size={18} className="text-indigo-400" />
-            Top GCN Saliency Pathways
+            Top Anatomical Saliency Pathways
           </h3>
         </div>
         <div className="badge badge-primary">

@@ -151,12 +151,13 @@ export default function ImageUploader({
     <div
       className="glass-panel"
       style={{
-        padding: '24px',
+        padding: '28px 24px 24px 24px',
         display: 'flex',
         flexDirection: 'column',
         gap: '20px',
         border: '1px solid rgba(255, 255, 255, 0.08)',
         backgroundColor: 'rgba(15, 23, 42, 0.8)',
+        scrollMarginTop: '84px',
       }}
     >
       {/* Header Bar */}
@@ -309,7 +310,7 @@ export default function ImageUploader({
               </span>
             </div>
             <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-              3×3 Mod-Stem • Bi-LSTM Sequence
+              3×3 Mod-Stem • Bi-LSTM • 25.8M Params
             </span>
             <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '3px' }}>
               Preserves subtle pediatric facial geometry across vertical anatomical slices
@@ -354,7 +355,7 @@ export default function ImageUploader({
               </span>
             </div>
             <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-              Standard 7×7 Stem • Global Avg Pool
+              Standard 7×7 Stem • 23.5M Params
             </span>
             <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '3px' }}>
               Standard deep feature extractor for baseline comparison
@@ -489,7 +490,7 @@ export default function ImageUploader({
               </span>
             </div>
             <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-              Depthwise Separable • 3.4M Params
+              Depthwise Separable • 2.2M Params
             </span>
             <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '3px' }}>
               Ultra-fast mobile inference for rapid point-of-care clinic screening
@@ -534,7 +535,7 @@ export default function ImageUploader({
               </span>
             </div>
             <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-              16×16 Patches • 86.6M Params
+              16×16 Patches • 85.8M Params
             </span>
             <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '3px' }}>
               Self-attention benchmark compared against inductive bias models
