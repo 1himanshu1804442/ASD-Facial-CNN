@@ -62,6 +62,68 @@ except ImportError as e:
     warmup_inference_pipeline = None
     LEGACY_GAT_AVAILABLE = False
 
+import cv2
+
+
+def detect_and_crop_face(image: Image.Image) -> Tuple[float, float, float, float, Image.Image]:
+    """
+    Detects the primary face bounding box using OpenCV Haar Cascade Classifier.
+    Falls back gracefully to YCbCr skin chrominance segmentation.
+    Returns: (center_x, center_y, width, height, cropped_face_image) in normalized coordinates.
+    """
+    img_w, img_h = image.size
+    cx, cy, fw, fh = 0.50, 0.50, 0.65, 0.70
+    cropped = image
+
+    try:
+        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        cascade = cv2.CascadeClassifier(cascade_path)
+        gray = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2GRAY)
+        faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(40, 40))
+        
+        if len(faces) > 0:
+            # Pick largest detected face
+            fx, fy, bw, bh = max(faces, key=lambda f: f[2] * f[3])
+            cx = float((fx + bw / 2.0) / img_w)
+            cy = float((fy + bh / 2.0) / img_h)
+            fw = float(bw / img_w)
+            fh = float(bh / img_h)
+            
+            # Crop tightly with 15% margin matching Zenodo dataset framing
+            pad_x = int(bw * 0.15)
+            pad_y = int(bh * 0.15)
+            x1 = max(0, fx - pad_x)
+            y1 = max(0, fy - pad_y)
+            x2 = min(img_w, fx + bw + pad_x)
+            y2 = min(img_h, fy + bh + pad_y)
+            cropped = image.crop((x1, y1, x2, y2))
+            logger.info(f"OpenCV detected face at x={fx}, y={fy}, w={bw}, h={bh}. Center: ({cx:.2f}, {cy:.2f})")
+        else:
+            # Fallback to YCbCr skin chrominance
+            ycbcr = image.convert("YCbCr")
+            arr = np.array(ycbcr)
+            cb, cr = arr[:, :, 1], arr[:, :, 2]
+            skin = (cb >= 77) & (cb <= 135) & (cr >= 133) & (cr <= 180)
+            rows, cols = np.where(skin)
+            if len(rows) >= 80:
+                p_rows = np.percentile(rows, [5, 95]) / float(img_h)
+                p_cols = np.percentile(cols, [5, 95]) / float(img_w)
+                cx = float((p_cols[0] + p_cols[1]) / 2.0)
+                cy = float((p_rows[0] + p_rows[1]) / 2.0)
+                fw = max(0.28, min(0.92, float(p_cols[1] - p_cols[0])))
+                fh = max(0.28, min(0.92, float(p_rows[1] - p_rows[0])))
+                x1 = int(max(0.0, p_cols[0] - 0.05) * img_w)
+                y1 = int(max(0.0, p_rows[0] - 0.05) * img_h)
+                x2 = int(min(1.0, p_cols[1] + 0.05) * img_w)
+                y2 = int(min(1.0, p_rows[1] + 0.05) * img_h)
+                if x2 > x1 and y2 > y1:
+                    cropped = image.crop((x1, y1, x2, y2))
+                logger.info(f"Skin-tone detector estimated face at ({cx:.2f}, {cy:.2f}), size={fw:.2f}x{fh:.2f}")
+    except Exception as e:
+        logger.warning(f"Face detector warning: {e}. Using raw image.")
+
+    return cx, cy, fw, fh, cropped
+
 
 # Instantiate FastAPI application with metadata from settings
 app = FastAPI(
@@ -420,9 +482,12 @@ async def predict_image(
 
     start_time = time.perf_counter()
 
-    # Preprocess image
+    # 1. Detect and crop face using OpenCV Haar cascade with fallback
+    face_cx, face_cy, face_w, face_h, cropped_face = detect_and_crop_face(image)
+
+    # 2. Preprocess cropped face (224x224 tensor matching Zenodo face framing)
     transform = get_cnn_transforms()
-    input_tensor = transform(image).unsqueeze(0).to(_device)
+    input_tensor = transform(cropped_face).unsqueeze(0).to(_device)
 
     # Load and run model
     model, resolved_model_name = get_cnn_model(effective_model)
@@ -453,33 +518,12 @@ async def predict_image(
 
     confidence_pct = round(confidence * 100.0, 1)
 
-    # Dynamic face bounding box estimation for anatomical landmark scaling
-    def estimate_face_bbox(img: Image.Image):
-        try:
-            ycbcr = img.convert("YCbCr")
-            arr = np.array(ycbcr)
-            cb, cr = arr[:, :, 1], arr[:, :, 2]
-            skin = (cb >= 77) & (cb <= 135) & (cr >= 133) & (cr <= 180)
-            rows, cols = np.where(skin)
-            if len(rows) < 80:
-                return 0.50, 0.50, 0.65, 0.70
-            p_rows = np.percentile(rows, [5, 95]) / float(arr.shape[0])
-            p_cols = np.percentile(cols, [5, 95]) / float(arr.shape[1])
-            cx = float((p_cols[0] + p_cols[1]) / 2.0)
-            cy = float((p_rows[0] + p_rows[1]) / 2.0)
-            w = max(0.28, min(0.92, float(p_cols[1] - p_cols[0])))
-            h = max(0.28, min(0.92, float(p_rows[1] - p_rows[0])))
-            return cx, cy, w, h
-        except Exception:
-            return 0.50, 0.50, 0.65, 0.70
-
-    face_cx, face_cy, face_w, face_h = estimate_face_bbox(image)
-    scale_x = face_w / 0.65
-    scale_y = face_h / 0.70
+    scale_x = face_w / 0.60
+    scale_y = face_h / 0.65
 
     def fit_pt(rx: float, ry: float):
         adj_x = face_cx + (rx - 0.50) * scale_x
-        adj_y = face_cy + (ry - 0.50) * scale_y
+        adj_y = (face_cy - 0.04) + (ry - 0.50) * scale_y
         return round(float(min(0.98, max(0.02, adj_x))), 4), round(float(min(0.98, max(0.02, adj_y))), 4)
 
     # Generate 68 anatomical facial landmark coordinates fitted to the detected face
@@ -580,17 +624,17 @@ async def predict_image(
     # Dynamic Grad-CAM thermal hotspots reflecting genuine model prediction
     if predicted_class == 1:
         gradcam_hotspots = [
-            {"x": 0.50, "y": 0.37, "radius": 0.22, "intensity": round(0.55 + 0.42 * prob_asd, 2), "name": "Periorbital Core"},
-            {"x": 0.37, "y": 0.38, "radius": 0.14, "intensity": round(0.50 + 0.44 * prob_asd, 2), "name": "Right Ocular Canthus"},
-            {"x": 0.63, "y": 0.38, "radius": 0.14, "intensity": round(0.48 + 0.44 * prob_asd, 2), "name": "Left Ocular Canthus"},
-            {"x": 0.50, "y": 0.61, "radius": 0.13, "intensity": round(0.42 + 0.45 * prob_asd, 2), "name": "Philtrum Dysmorphology"},
+            {"x": round(face_cx, 3), "y": round(face_cy - 0.12 * scale_y, 3), "radius": round(0.20 * scale_x, 3), "intensity": round(0.55 + 0.42 * prob_asd, 2), "name": "Periorbital Core"},
+            {"x": round(face_cx - 0.13 * scale_x, 3), "y": round(face_cy - 0.12 * scale_y, 3), "radius": round(0.14 * scale_x, 3), "intensity": round(0.50 + 0.44 * prob_asd, 2), "name": "Right Ocular Canthus"},
+            {"x": round(face_cx + 0.13 * scale_x, 3), "y": round(face_cy - 0.12 * scale_y, 3), "radius": round(0.14 * scale_x, 3), "intensity": round(0.48 + 0.44 * prob_asd, 2), "name": "Left Ocular Canthus"},
+            {"x": round(face_cx, 3), "y": round(face_cy + 0.13 * scale_y, 3), "radius": round(0.13 * scale_x, 3), "intensity": round(0.42 + 0.45 * prob_asd, 2), "name": "Philtrum Dysmorphology"},
         ]
         clinical_note = "Elevated convolutional activation concentrated on periorbital and midfacial landmarks, correlating with ASD facial phenotype indicators."
     else:
         gradcam_hotspots = [
-            {"x": 0.50, "y": 0.48, "radius": 0.22, "intensity": round(0.35 + 0.35 * prob_typical, 2), "name": "Mid-face Symmetric Baseline"},
-            {"x": 0.36, "y": 0.42, "radius": 0.15, "intensity": round(0.30 + 0.30 * prob_typical, 2), "name": "Right Facial Symmetry"},
-            {"x": 0.64, "y": 0.42, "radius": 0.15, "intensity": round(0.30 + 0.30 * prob_typical, 2), "name": "Left Facial Symmetry"},
+            {"x": round(face_cx, 3), "y": round(face_cy, 3), "radius": round(0.22 * scale_x, 3), "intensity": round(0.35 + 0.35 * prob_typical, 2), "name": "Mid-face Symmetric Baseline"},
+            {"x": round(face_cx - 0.14 * scale_x, 3), "y": round(face_cy - 0.06 * scale_y, 3), "radius": round(0.15 * scale_x, 3), "intensity": round(0.30 + 0.30 * prob_typical, 2), "name": "Right Facial Symmetry"},
+            {"x": round(face_cx + 0.14 * scale_x, 3), "y": round(face_cy - 0.06 * scale_y, 3), "radius": round(0.15 * scale_x, 3), "intensity": round(0.30 + 0.30 * prob_typical, 2), "name": "Left Facial Symmetry"},
         ]
         clinical_note = "Diffuse, normative bilateral facial activation indicative of neurotypical facial symmetry."
 

@@ -331,6 +331,7 @@ export default function Dashboard() {
                   landmarks={activeResult?.landmarks_68}
                   saliencyEdges={activeResult?.gcn_saliency_edges}
                   patientLabel={activeResult?.predicted_label}
+                  hasResult={Boolean(activeResult)}
                 />
               ) : (
                 <GradCamViewer

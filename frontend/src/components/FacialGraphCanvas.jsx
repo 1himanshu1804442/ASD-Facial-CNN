@@ -37,6 +37,7 @@ export default function FacialGraphCanvas({
   landmarks = CANONICAL_68_LANDMARKS,
   saliencyEdges = [],
   patientLabel = 'Screening in progress',
+  hasResult = false,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -84,7 +85,7 @@ export default function FacialGraphCanvas({
     return () => {
       isSubscribed = false;
     };
-  }, [imageUrl, points, saliencyEdges, showLandmarkNodes, showSaliencyGraph, showEdgeLabels, showContourMesh, hoveredPoint]);
+  }, [imageUrl, points, saliencyEdges, showLandmarkNodes, showSaliencyGraph, showEdgeLabels, showContourMesh, hoveredPoint, hasResult]);
 
   /**
    * Draws the complete composite scene: Portrait, Contour Wireframe, GCN Edges, and 68 Landmarks.
@@ -123,6 +124,30 @@ export default function FacialGraphCanvas({
       x: pt.x * width,
       y: pt.y * height,
     });
+
+    // If screening hasn't been executed yet, display clean portrait with an intuitive prompt badge
+    if (!hasResult) {
+      ctx.save();
+      const badgeW = 360;
+      const badgeH = 40;
+      const badgeX = (width - badgeW) / 2;
+      const badgeY = height - 56;
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.beginPath();
+      ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 10);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(99, 102, 241, 0.45)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#c7d2fe';
+      ctx.font = '600 12.5px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Portrait Loaded • Click "Run CNN Facial Screening"', width / 2, badgeY + badgeH / 2);
+      ctx.restore();
+      return;
+    }
 
     // 2. Draw Natural Anatomical Contour Wireframe (if enabled)
     if (showContourMesh) {
