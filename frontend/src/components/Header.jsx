@@ -39,7 +39,7 @@ export default function Header({ isOnline, onOpenHistory, historyCount = 0 }) {
             <span className="badge badge-primary">CNN Vision</span>
           </div>
           <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8' }}>
-            Deep Transfer Learning (ResNet-50 & MobileNet-V2) for Pediatric Facial Triage
+            Preliminary Screening Framework via Mod-Stem ResNet-50 &amp; Spatial Bi-LSTM
           </p>
         </div>
       </div>

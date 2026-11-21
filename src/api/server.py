@@ -937,7 +937,7 @@ async def predict_facial_image(
 def get_model_benchmarks():
     """
     Returns empirical evaluation benchmarks for all candidate deep learning architectures:
-    Mod-Stem ResNet-50 + LSTM (Proposed Hybrid), ResNet-50, DenseNet-121,
+    Mod-Stem ResNet-50 + Spatial Bi-LSTM (Proposed), ResNet-50, DenseNet-121,
     EfficientNet-B0, MobileNet-V2, and Vision Transformer (ViT-B/16).
     """
     project_root = Path(__file__).resolve().parent.parent.parent
@@ -949,7 +949,10 @@ def get_model_benchmarks():
                 data = json.load(f)
             return {
                 "status": "success",
-                "dataset": "Zenodo 15073612 Pediatric ASD Dataset (300 Held-Out Cohort)",
+                "framework_title": "A Web-Based Preliminary Screening Framework for Autism Spectrum Disorder via Modified-Stem ResNet-50 and Spatial Bi-LSTM",
+                "dataset": "ASD Detection from Facial Images – Dataset, Code and Results (Contreras, UNIFESP, 2025; Zenodo DOI: 10.5281/zenodo.15073612, derived from Piosenka collection)",
+                "latency_hardware": "provisional batched T4 GPU timing (0.22-0.62 ms/image; single-image edge CPU runs ~24-85 ms)",
+                "clinical_scope": "Preliminary research screening aid only; not for clinical diagnosis",
                 "primary_model": "modstem_lstm",
                 "models": data
             }
@@ -959,80 +962,83 @@ def get_model_benchmarks():
     # Fallback to authentic empirical literature survey benchmark figures
     return {
         "status": "success",
-        "dataset": "Zenodo 15073612 Pediatric ASD Dataset (300 Held-Out Cohort)",
+        "framework_title": "A Web-Based Preliminary Screening Framework for Autism Spectrum Disorder via Modified-Stem ResNet-50 and Spatial Bi-LSTM",
+        "dataset": "ASD Detection from Facial Images – Dataset, Code and Results (Contreras, UNIFESP, 2025; Zenodo DOI: 10.5281/zenodo.15073612, derived from Piosenka collection)",
+        "latency_hardware": "provisional batched T4 GPU timing (0.22-0.62 ms/image; single-image edge CPU runs ~24-85 ms)",
+        "clinical_scope": "Preliminary research screening aid only; not for clinical diagnosis",
         "primary_model": "modstem_lstm",
         "models": {
             "modstem_lstm": {
-                "architecture": "Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)",
-                "literature_citation": "Proposed Architecture (Yadav et al., 2026)",
+                "architecture": "Mod-Stem ResNet-50 + Spatial Bi-LSTM (Proposed)",
+                "literature_citation": "Proposed Architecture (This Work, 2026)",
                 "parameters_m": 25.8,
-                "accuracy": 0.8533,
-                "sensitivity": 0.8467,
-                "specificity": 0.8600,
-                "precision": 0.8581,
-                "f1_score": 0.8523,
-                "auc_roc": 0.9145,
-                "inference_latency_ms": 91.2
+                "accuracy": 0.8400,
+                "sensitivity": 0.8800,
+                "specificity": 0.8000,
+                "precision": 0.8148,
+                "f1_score": 0.8462,
+                "auc_roc": 0.9139,
+                "inference_latency_ms": 0.28
             },
             "resnet50": {
                 "architecture": "ResNet-50 (Residual Baseline)",
                 "literature_citation": "Khan et al. [11] / Monani et al. [13]",
                 "parameters_m": 23.5,
-                "accuracy": 0.8700,
-                "sensitivity": 0.8867,
-                "specificity": 0.8533,
-                "precision": 0.8581,
-                "f1_score": 0.8721,
-                "auc_roc": 0.9408,
-                "inference_latency_ms": 74.39
+                "accuracy": 0.8600,
+                "sensitivity": 0.8067,
+                "specificity": 0.9133,
+                "precision": 0.9030,
+                "f1_score": 0.8521,
+                "auc_roc": 0.9514,
+                "inference_latency_ms": 0.32
             },
             "densenet121": {
                 "architecture": "DenseNet-121 (Dense Feature-Reuse CNN)",
                 "literature_citation": "Khan et al. [11] (96.0% Acc on ASD)",
                 "parameters_m": 7.0,
-                "accuracy": 0.8533,
-                "sensitivity": 0.8200,
-                "specificity": 0.8867,
-                "precision": 0.8786,
-                "f1_score": 0.8483,
-                "auc_roc": 0.9444,
-                "inference_latency_ms": 68.67
+                "accuracy": 0.8500,
+                "sensitivity": 0.8533,
+                "specificity": 0.8467,
+                "precision": 0.8477,
+                "f1_score": 0.8505,
+                "auc_roc": 0.9296,
+                "inference_latency_ms": 0.62
             },
             "efficientnet_b0": {
                 "architecture": "EfficientNet-B0 (Compound Scaled CNN)",
                 "literature_citation": "Rahman & Subashini [2] (96.6% AUC on Facial Screening)",
                 "parameters_m": 4.0,
-                "accuracy": 0.8267,
-                "sensitivity": 0.8400,
+                "accuracy": 0.8367,
+                "sensitivity": 0.8600,
                 "specificity": 0.8133,
-                "precision": 0.8182,
-                "f1_score": 0.8289,
-                "auc_roc": 0.8983,
-                "inference_latency_ms": 28.6
+                "precision": 0.8217,
+                "f1_score": 0.8404,
+                "auc_roc": 0.9142,
+                "inference_latency_ms": 0.35
             },
             "mobilenet_v2": {
                 "architecture": "MobileNet-V2 (Lightweight Mobile Triage)",
                 "literature_citation": "Beary et al. [1] / Alkahtani et al. [7]",
                 "parameters_m": 2.2,
-                "accuracy": 0.8667,
-                "sensitivity": 0.8867,
-                "specificity": 0.8467,
-                "precision": 0.8526,
-                "f1_score": 0.8693,
-                "auc_roc": 0.9292,
-                "inference_latency_ms": 23.99
+                "accuracy": 0.8867,
+                "sensitivity": 0.9067,
+                "specificity": 0.8667,
+                "precision": 0.8718,
+                "f1_score": 0.8889,
+                "auc_roc": 0.9448,
+                "inference_latency_ms": 0.23
             },
             "vit": {
                 "architecture": "Vision Transformer ViT-B/16 (High Parameter Benchmark)",
                 "literature_citation": "Revathi & Arunarani [3] (ViT Attention on ASD)",
                 "parameters_m": 85.8,
-                "accuracy": 0.8233,
-                "sensitivity": 0.9267,
-                "specificity": 0.7200,
-                "precision": 0.7680,
-                "f1_score": 0.8399,
-                "auc_roc": 0.9329,
-                "inference_latency_ms": 187.25
+                "accuracy": 0.8700,
+                "sensitivity": 0.8733,
+                "specificity": 0.8667,
+                "precision": 0.8675,
+                "f1_score": 0.8704,
+                "auc_roc": 0.9452,
+                "inference_latency_ms": 0.22
             }
         }
     }

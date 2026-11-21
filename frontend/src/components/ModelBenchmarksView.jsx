@@ -42,19 +42,19 @@ export default function ModelBenchmarksView({ onSwitchToScreening, benchmarkData
               Model Performance & Benchmark Analysis
             </h2>
             <p className="text-sm text-slate-300 max-w-3xl">
-              Quantitative comparison of our proposed <strong>Facial Landmark GCN</strong> against baseline Convolutional Neural Networks (Ahmad et al., 2024) and Vision Transformers (Contreras et al., 2025) on the standardized Zenodo ASD dataset.
+              Quantitative comparison of our proposed <strong>Mod-Stem ResNet-50 + Spatial Bi-LSTM</strong> against literature baseline Convolutional Neural Networks and Vision Transformers on the standardized Zenodo ASD benchmark dataset (300-image held-out test cohort).
             </p>
           </div>
           <div className="flex items-center gap-3">
             <div className="bg-slate-900/80 border border-slate-700/60 rounded-xl px-4 py-2.5 text-center">
-              <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider">MobileNet-V2</span>
-              <span className="text-xl font-bold text-cyan-400">2.2M</span>
-              <span className="block text-[10px] text-emerald-400 font-medium">24 ms Edge Latency</span>
+              <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Proposed Hybrid</span>
+              <span className="text-xl font-bold text-cyan-400">88.00%</span>
+              <span className="block text-[10px] text-emerald-400 font-medium">Screening Sensitivity</span>
             </div>
             <div className="bg-slate-900/80 border border-slate-700/60 rounded-xl px-4 py-2.5 text-center">
               <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Top AUROC</span>
-              <span className="text-xl font-bold text-emerald-400">0.944</span>
-              <span className="block text-[10px] text-emerald-400 font-medium">DenseNet-121</span>
+              <span className="text-xl font-bold text-emerald-400">0.951</span>
+              <span className="block text-[10px] text-emerald-400 font-medium">ResNet-50 Baseline</span>
             </div>
           </div>
         </div>

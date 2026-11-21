@@ -78,7 +78,7 @@ Write-Host "`n[Spring Boot] Starting Java Spring Boot 3 Gateway on port 8080..."
 
 $springProfile = if ($pgActive -and -not $ForceH2) { "default" } else { "h2" }
 $springDir = Join-Path $PSScriptRoot "backend-spring"
-$springCmd = "cd '$springDir'; .\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=$springProfile"
+$springCmd = "Set-Location '$springDir'; [System.Environment]::SetEnvironmentVariable('SPRING_PROFILES_ACTIVE', '$springProfile', 'Process'); .\mvnw.cmd spring-boot:run"
 
 $springProcess = Start-Process -FilePath "powershell.exe" `
     -ArgumentList "-NoExit", "-Command", "Write-Host '--- Spring Boot 3 Gateway (:8080, Profile: $springProfile) ---' -ForegroundColor Cyan; $springCmd" `

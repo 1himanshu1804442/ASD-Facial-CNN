@@ -83,12 +83,12 @@ class ModStemResNet50LSTM(nn.Module):
     """
     Hybrid Deep Learning Architecture combining:
     1. Modified Stem (Mod-Stem) ResNet-50 for high-resolution spatial feature extraction.
-    2. Bidirectional LSTM (Bi-LSTM) modeling spatial sequence dependencies across facial regions.
+    2. Bidirectional LSTM (Spatial Bi-LSTM) modeling spatial sequence dependencies across facial regions.
     
     Why: Static ConvNets evaluate local patches independently, whereas autism facial phenotypes
     depend on relational proportions (e.g., inter-ocular distance relative to midface breadth).
-    This architecture slices the 2048-dimensional deep feature map into vertical anatomical tiers
-    (forehead -> eyes -> nose -> philtrum -> mouth -> chin) and processes them sequentially with a Bi-LSTM.
+    This architecture slices the 2048-dimensional deep feature map into vertical spatial tiers
+    (forehead -> eyes -> nose -> philtrum -> mouth -> chin) and processes them sequentially with a Spatial Bi-LSTM.
     """
     def __init__(
         self,
@@ -112,10 +112,10 @@ class ModStemResNet50LSTM(nn.Module):
         self.layer3 = base_resnet.layer3
         self.layer4 = base_resnet.layer4  # Shape: (B, 2048, 7, 7)
 
-        # 3. Anatomical Regional Sequence Pooling along vertical facial axis (7 regions)
+        # 3. Spatial Regional Sequence Pooling along vertical facial axis (7 spatial tiers)
         self.region_pool = nn.AdaptiveAvgPool2d((7, 1))
 
-        # 4. Bidirectional LSTM Sequence Modeling
+        # 4. Spatial Bidirectional LSTM Sequence Modeling
         self.lstm = nn.LSTM(
             input_size=2048,
             hidden_size=lstm_hidden_dim,
@@ -145,11 +145,11 @@ class ModStemResNet50LSTM(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)  # (B, 2048, 7, 7)
 
-        # Extract 7 vertical anatomical facial regions
+        # Extract 7 vertical spatial facial regions
         x = self.region_pool(x)  # (B, 2048, 7, 1)
         x = x.squeeze(-1).permute(0, 2, 1).contiguous()  # (B, 7, 2048) -> Sequence of 7 tokens in contiguous memory
 
-        # Process sequential morphological relationships via Bi-LSTM
+        # Process sequential morphological relationships via Spatial Bi-LSTM
         lstm_out, _ = self.lstm(x)  # (B, 7, 256)
 
         # Global temporal average pooling across the 7 regions
@@ -163,10 +163,15 @@ class ModStemResNet50LSTM(nn.Module):
 def build_modstem_resnet50_lstm(
     pretrained: bool = True,
     num_classes: int = 2,
-    freeze_early: bool = True
+    freeze_early: bool = False,
+    unfreeze_layer1: bool = True
 ) -> nn.Module:
     """
     Factory function to construct the Mod-Stem ResNet-50 + LSTM Hybrid model.
+    By default, freeze_early=False and unfreeze_layer1=True, unfreezing layer1 (conv2_x)
+    alongside the custom stem, residual blocks, LSTM, and classifier head.
+    This enables low-level facial contour and craniofacial dysmorphic features to adapt directly
+    to ASD screening while preserving pretrained weights via differential learning rates.
     """
     model = ModStemResNet50LSTM(
         num_classes=num_classes,
@@ -177,21 +182,27 @@ def build_modstem_resnet50_lstm(
     )
 
     if freeze_early:
-        # Freeze only layer1; allow layer2, layer3, and layer4 to adapt to ModStem activations
+        # If freeze_early is explicitly requested, freeze layer1 unless unfreeze_layer1 is True
         for param in model.layer1.parameters():
-            param.requires_grad = False
-        for param in model.stem.parameters():
+            param.requires_grad = unfreeze_layer1
+    else:
+        # Unfrozen by default: layer1 is fully trainable
+        for param in model.layer1.parameters():
             param.requires_grad = True
-        for param in model.layer2.parameters():
-            param.requires_grad = True
-        for param in model.layer3.parameters():
-            param.requires_grad = True
-        for param in model.layer4.parameters():
-            param.requires_grad = True
-        for param in model.lstm.parameters():
-            param.requires_grad = True
-        for param in model.classifier.parameters():
-            param.requires_grad = True
+
+    # Ensure custom stem, remaining backbone blocks, LSTM, and classifier head are trainable
+    for param in model.stem.parameters():
+        param.requires_grad = True
+    for param in model.layer2.parameters():
+        param.requires_grad = True
+    for param in model.layer3.parameters():
+        param.requires_grad = True
+    for param in model.layer4.parameters():
+        param.requires_grad = True
+    for param in model.lstm.parameters():
+        param.requires_grad = True
+    for param in model.classifier.parameters():
+        param.requires_grad = True
 
     return model
 

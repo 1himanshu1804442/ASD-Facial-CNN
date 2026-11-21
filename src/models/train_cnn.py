@@ -9,8 +9,15 @@ import sys
 import time
 import copy
 import json
+import argparse
 from pathlib import Path
 from typing import Dict, Any, Tuple
+
+# Ensure project root is in sys.path for direct CLI or Colab execution
+project_root = Path(__file__).resolve().parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -252,13 +259,25 @@ def train_and_export_cnn(
     train_loader: DataLoader,
     val_loader: DataLoader,
     output_path: Path,
-    epochs: int = 5,
+    epochs: int = 20,
     lr: float = 1e-4,
+    patience: int = 5,
     device: torch.device = None
 ) -> nn.Module:
     """
-    Trains a model for pediatric ASD facial image classification
+    Trains a model for pediatric ASD facial image classification with early stopping,
+    Cosine Annealing learning rate scheduling, differential learning rates for hybrid models,
     and exports authentic PyTorch model weights to disk.
+    
+    Args:
+        model_name: Name of architecture (e.g. 'modstem_lstm', 'resnet50').
+        train_loader: Training DataLoader.
+        val_loader: Validation DataLoader for early stopping evaluation.
+        output_path: Destination .pth file path.
+        epochs: Maximum training epochs (default: 20).
+        lr: Base learning rate (default: 1e-4).
+        patience: Early stopping patience epochs before halting (default: 5).
+        device: PyTorch device (CUDA or CPU).
     """
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -268,7 +287,7 @@ def train_and_export_cnn(
     # Instantiate requested model architecture
     norm_name = model_name.lower().replace("-", "_")
     if norm_name in ["modstem_lstm", "modstem_resnet50_lstm", "hybrid_resnet50_lstm"]:
-        model = build_modstem_resnet50_lstm(pretrained=True, num_classes=2)
+        model = build_modstem_resnet50_lstm(pretrained=True, num_classes=2, freeze_early=False, unfreeze_layer1=True)
     elif norm_name in ["resnet50", "resnet_50"]:
         model = build_resnet50(pretrained=True, num_classes=2)
     elif norm_name in ["densenet121", "densenet_121", "densenet"]:
@@ -284,39 +303,83 @@ def train_and_export_cnn(
 
     model = model.to(device)
 
-    # Filter trainable parameters only
+    # Filter trainable parameters and set up differential learning rates
     trainable_params = [p for p in model.parameters() if p.requires_grad]
     logger.info(
         f"Model {model_name} total parameters: {sum(p.numel() for p in model.parameters()):,} | "
         f"Trainable parameters: {sum(p.numel() for p in trainable_params):,}"
     )
 
-    optimizer = optim.Adam(trainable_params, lr=lr)
+    if norm_name in ["modstem_lstm", "modstem_resnet50_lstm", "hybrid_resnet50_lstm"]:
+        # Differential learning rates:
+        # Pretrained backbone layers (layer1-layer4) trained at 1e-4 to prevent catastrophic forgetting
+        # Freshly initialized layers (Mod-Stem, Bi-LSTM, classification head) trained at 5e-4
+        backbone_params = []
+        for blk in [model.layer1, model.layer2, model.layer3, model.layer4]:
+            backbone_params.extend([p for p in blk.parameters() if p.requires_grad])
+
+        fresh_params = []
+        for blk in [model.stem, model.lstm, model.classifier]:
+            fresh_params.extend([p for p in blk.parameters() if p.requires_grad])
+
+        optimizer = optim.Adam([
+            {"params": backbone_params, "lr": lr, "weight_decay": 1e-4},
+            {"params": fresh_params, "lr": 5e-4, "weight_decay": 1e-4}
+        ])
+        logger.info(
+            f"Configured differential learning rates for {model_name}: "
+            f"backbone ({sum(p.numel() for p in backbone_params):,} params) @ lr={lr}, "
+            f"fresh layers ({sum(p.numel() for p in fresh_params):,} params) @ lr=5e-4, weight_decay=1e-4"
+        )
+    else:
+        optimizer = optim.Adam(trainable_params, lr=lr, weight_decay=1e-4)
+
+    # Cosine Annealing Learning Rate Scheduler stepping once per epoch
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
     criterion = nn.CrossEntropyLoss()
 
+    best_val_loss = float("inf")
     best_val_acc = 0.0
     best_weights = None
+    patience_counter = 0
 
     start_time = time.time()
     for epoch in range(1, epochs + 1):
         epoch_start = time.time()
         train_loss, train_acc = train_one_epoch(model, train_loader, optimizer, criterion, device)
         val_loss, val_acc = validate_model(model, val_loader, criterion, device)
+        scheduler.step()
+        current_lr = scheduler.get_last_lr()[0]
         epoch_time = time.time() - epoch_start
 
         logger.info(
             f"[{model_name.upper()}] Epoch {epoch}/{epochs} ({epoch_time:.1f}s) | "
             f"Train Loss: {train_loss:.4f} - Train Acc: {train_acc * 100:.2f}% | "
-            f"Val Loss: {val_loss:.4f} - Val Acc: {val_acc * 100:.2f}%"
+            f"Val Loss: {val_loss:.4f} - Val Acc: {val_acc * 100:.2f}% | "
+            f"LR: {current_lr:.6f}"
         )
 
-        # Track best weights based on validation accuracy (deep copy to avoid shallow reference mutation)
-        if val_acc >= best_val_acc:
+        # Early Stopping tracking best weights on validation accuracy/loss
+        if val_acc > best_val_acc or (val_acc == best_val_acc and val_loss < best_val_loss):
             best_val_acc = val_acc
+            best_val_loss = val_loss
             best_weights = copy.deepcopy(model.state_dict())
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            logger.info(f"[{model_name.upper()}] EarlyStopping counter: {patience_counter}/{patience}")
+            if patience_counter >= patience:
+                logger.info(
+                    f"[{model_name.upper()}] Early stopping triggered at epoch {epoch}. "
+                    f"Restoring best weights (Val Acc: {best_val_acc * 100:.2f}%, Val Loss: {best_val_loss:.4f})."
+                )
+                break
 
     total_training_time = time.time() - start_time
-    logger.info(f"Completed {epochs} epochs for {model_name} in {total_training_time:.1f}s. Best Val Acc: {best_val_acc * 100:.2f}%")
+    logger.info(
+        f"Completed training for {model_name} in {total_training_time:.1f}s. "
+        f"Best Val Acc: {best_val_acc * 100:.2f}%, Val Loss: {best_val_loss:.4f}"
+    )
 
     # Ensure target directory exists and save state dictionary
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -334,28 +397,48 @@ def run_pipeline(
     data_dir_str: str = "data/zenodo/extracted/ASD Data",
     models_dir_str: str = "models",
     results_dir_str: str = "results",
-    epochs: int = 5,
+    epochs: int = 20,
     batch_size: int = 32,
     lr: float = 1e-4,
+    patience: int = 5,
+    model_choice: str = "all",
     train_vit: bool = True
 ):
     """
-    Executes complete training and export pipeline for all 4 candidate architectures:
-    1. Mod-Stem ResNet-50 + LSTM (Proposed Primary Model)
+    Executes training and evaluation pipeline for candidate architectures:
+    1. Mod-Stem ResNet-50 + Spatial Bi-LSTM (Proposed Primary Model)
     2. ResNet-50 (Residual Baseline)
-    3. MobileNet-V2 (Lightweight Triage)
-    4. Vision Transformer ViT-B/16 (High Parameter Benchmark)
+    3. DenseNet-121 (Dense Feature-Reuse CNN)
+    4. EfficientNet-B0 (Compound Scaled CNN)
+    5. MobileNet-V2 (Lightweight Mobile Triage)
+    6. Vision Transformer ViT-B/16 (High Parameter Benchmark)
     
-    Saves authentic model weights to models/ and updates results/real_benchmark_metrics.json.
+    Supports training a single model or all 6, saving weights to models/ and
+    updating results/real_benchmark_metrics.json.
     """
     project_root = Path(__file__).resolve().parent.parent.parent
-    data_dir = project_root / data_dir_str if not Path(data_dir_str).is_absolute() else Path(data_dir_str)
-    
-    # Check if local Downloads dataset exists as fallback if project data path not yet extracted
-    if not data_dir.exists():
-        fallback_data = Path(r"C:\Users\hy180\Downloads\Zenodo_ASD_Dataset\ASD Data")
-        if fallback_data.exists():
-            data_dir = fallback_data
+    raw_data_path = Path(data_dir_str) if Path(data_dir_str).is_absolute() else (project_root / data_dir_str)
+
+    # Auto-discover directory containing the 'Train' split
+    candidate_paths = [
+        raw_data_path,
+        project_root / "ASD Data",
+        Path("ASD Data"),
+        project_root / "data" / "zenodo" / "extracted" / "ASD Data",
+        project_root / "data" / "zenodo" / "ASD Data",
+        project_root / "data" / "ASD Data",
+        project_root / "data",
+        Path("/content/data/zenodo/extracted/ASD Data"),
+        Path("/content/data/ASD Data"),
+        Path("/content/ASD Data"),
+        Path(r"C:\Users\hy180\Downloads\Zenodo_ASD_Dataset\ASD Data"),
+        Path(r"C:\Users\hy180\Downloads\Zenodo_ASD_Dataset"),
+    ]
+    data_dir = raw_data_path
+    for cand in candidate_paths:
+        if cand.exists() and (cand / "Train").exists():
+            data_dir = cand
+            break
 
     models_dir = project_root / models_dir_str if not Path(models_dir_str).is_absolute() else Path(models_dir_str)
     results_dir = project_root / results_dir_str if not Path(results_dir_str).is_absolute() else Path(results_dir_str)
@@ -378,17 +461,54 @@ def run_pipeline(
         num_workers=0
     )
 
-    MODEL_META = {
-        "modstem_lstm": ("Mod-Stem ResNet-50 + LSTM (Proposed Hybrid)", "Proposed Architecture (Yadav et al., 2026)"),
-        "resnet50": ("ResNet-50 (Residual Baseline)", "Khan et al. [11] / Monani et al. [13]"),
-        "densenet121": ("DenseNet-121 (Dense Feature-Reuse CNN)", "Khan et al. [11] (96.0% Acc on ASD)"),
-        "efficientnet_b0": ("EfficientNet-B0 (Compound Scaled CNN)", "Rahman & Subashini [2] (96.6% AUC on Facial Screening)"),
-        "mobilenet_v2": ("MobileNet-V2 (Lightweight Mobile Triage)", "Beary et al. [1] / Alkahtani et al. [7]"),
-        "vit": ("Vision Transformer ViT-B/16 (High Parameter Benchmark)", "Revathi & Arunarani [3] (ViT Attention on ASD)"),
+    MODEL_CONFIGS = {
+        "modstem_lstm": {
+            "file": "modstem_resnet50_lstm_asd.pth",
+            "title": "Mod-Stem ResNet-50 + Spatial Bi-LSTM (Proposed)",
+            "citation": "Proposed Architecture (This Work, 2026)",
+        },
+        "resnet50": {
+            "file": "resnet50_asd.pth",
+            "title": "ResNet-50 (Residual Baseline)",
+            "citation": "Khan et al. [11] / Monani et al. [13]",
+        },
+        "densenet121": {
+            "file": "densenet121_asd.pth",
+            "title": "DenseNet-121 (Dense Feature-Reuse CNN)",
+            "citation": "Khan et al. [11] (96.0% Acc on ASD)",
+        },
+        "efficientnet_b0": {
+            "file": "efficientnet_b0_asd.pth",
+            "title": "EfficientNet-B0 (Compound Scaled CNN)",
+            "citation": "Rahman & Subashini [2] (96.6% AUC on Facial Screening)",
+        },
+        "mobilenet_v2": {
+            "file": "mobilenetv2_asd.pth",
+            "title": "MobileNet-V2 (Lightweight Mobile Triage)",
+            "citation": "Beary et al. [1] / Alkahtani et al. [7]",
+        },
+        "vit": {
+            "file": "vit_asd.pth",
+            "title": "Vision Transformer ViT-B/16 (High Parameter Benchmark)",
+            "citation": "Revathi & Arunarani [3] (ViT Attention on ASD)",
+        },
     }
 
+    # Load existing benchmark metrics so single-model runs augment rather than overwrite
+    metrics_json_path = results_dir / "real_benchmark_metrics.json"
+    benchmark_results = {}
+    if metrics_json_path.exists():
+        try:
+            with open(metrics_json_path, "r", encoding="utf-8") as f:
+                benchmark_results = json.load(f)
+            logger.info(f"Loaded {len(benchmark_results)} existing model benchmarks from {metrics_json_path}")
+        except Exception as e:
+            logger.warning(f"Could not load existing benchmark metrics: {e}")
+
     def package_metrics(model_key: str, model: nn.Module) -> Dict[str, Any]:
-        arch_title, citation = MODEL_META.get(model_key, (model_key, "Literature Review"))
+        cfg = MODEL_CONFIGS.get(model_key, {})
+        arch_title = cfg.get("title", model_key)
+        citation = cfg.get("citation", "Literature Review")
         params_m = round(sum(p.numel() for p in model.parameters()) / 1e6, 1)
         raw_metrics = evaluate_test_metrics(model, test_loader, device)
         return {
@@ -398,95 +518,80 @@ def run_pipeline(
             **raw_metrics
         }
 
-    benchmark_results = {}
+    # Determine models to train based on CLI / function argument
+    norm_choice = model_choice.lower().replace("-", "_")
+    if norm_choice == "all":
+        models_to_train = ["modstem_lstm", "resnet50", "densenet121", "efficientnet_b0", "mobilenet_v2"]
+        if train_vit:
+            models_to_train.append("vit")
+    elif norm_choice in ["modstem_lstm", "modstem_resnet50_lstm", "hybrid_resnet50_lstm"]:
+        models_to_train = ["modstem_lstm"]
+    elif norm_choice in ["resnet50", "resnet_50"]:
+        models_to_train = ["resnet50"]
+    elif norm_choice in ["densenet121", "densenet_121", "densenet"]:
+        models_to_train = ["densenet121"]
+    elif norm_choice in ["efficientnet_b0", "efficientnetb0", "efficientnet"]:
+        models_to_train = ["efficientnet_b0"]
+    elif norm_choice in ["mobilenet_v2", "mobilenetv2"]:
+        models_to_train = ["mobilenet_v2"]
+    elif norm_choice in ["vit", "vit_b_16", "vision_transformer"]:
+        models_to_train = ["vit"]
+    else:
+        raise ValueError(f"Unknown model choice: {model_choice}. Choose from: {list(MODEL_CONFIGS.keys())} or 'all'")
 
-    # 1. Train and save Mod-Stem ResNet-50 + LSTM (Proposed Primary Model)
-    modstem_path = models_dir / "modstem_resnet50_lstm_asd.pth"
-    modstem_model = train_and_export_cnn(
-        model_name="modstem_lstm",
-        train_loader=train_loader,
-        val_loader=val_loader,
-        output_path=modstem_path,
-        epochs=epochs,
-        lr=lr,
-        device=device
-    )
-    benchmark_results["modstem_lstm"] = package_metrics("modstem_lstm", modstem_model)
+    logger.info(f"Target models scheduled for training ({len(models_to_train)}): {models_to_train}")
 
-    # 2. Train and save baseline ResNet-50
-    resnet_path = models_dir / "resnet50_asd.pth"
-    resnet_model = train_and_export_cnn(
-        model_name="resnet50",
-        train_loader=train_loader,
-        val_loader=val_loader,
-        output_path=resnet_path,
-        epochs=epochs,
-        lr=lr,
-        device=device
-    )
-    benchmark_results["resnet50"] = package_metrics("resnet50", resnet_model)
-
-    # 3. Train and save DenseNet-121 (Literature Paper [11] Khan et al., 2024)
-    densenet_path = models_dir / "densenet121_asd.pth"
-    densenet_model = train_and_export_cnn(
-        model_name="densenet121",
-        train_loader=train_loader,
-        val_loader=val_loader,
-        output_path=densenet_path,
-        epochs=epochs,
-        lr=lr,
-        device=device
-    )
-    benchmark_results["densenet121"] = package_metrics("densenet121", densenet_model)
-
-    # 4. Train and save EfficientNet-B0 (Literature Paper [2] Rahman & Subashini, 2022)
-    effnet_path = models_dir / "efficientnet_b0_asd.pth"
-    effnet_model = train_and_export_cnn(
-        model_name="efficientnet_b0",
-        train_loader=train_loader,
-        val_loader=val_loader,
-        output_path=effnet_path,
-        epochs=epochs,
-        lr=lr,
-        device=device
-    )
-    benchmark_results["efficientnet_b0"] = package_metrics("efficientnet_b0", effnet_model)
-
-    # 5. Train and save MobileNet-V2
-    mobilenet_path = models_dir / "mobilenetv2_asd.pth"
-    mobilenet_model = train_and_export_cnn(
-        model_name="mobilenet_v2",
-        train_loader=train_loader,
-        val_loader=val_loader,
-        output_path=mobilenet_path,
-        epochs=epochs,
-        lr=lr,
-        device=device
-    )
-    benchmark_results["mobilenet_v2"] = package_metrics("mobilenet_v2", mobilenet_model)
-
-    # 6. Train and save Vision Transformer (ViT-B/16) (Literature Paper [3] Revathi & Arunarani, 2026)
-    if train_vit:
-        vit_path = models_dir / "vit_asd.pth"
-        vit_model = train_and_export_cnn(
-            model_name="vit",
+    for m_key in models_to_train:
+        cfg = MODEL_CONFIGS[m_key]
+        model_out_path = models_dir / cfg["file"]
+        trained_model = train_and_export_cnn(
+            model_name=m_key,
             train_loader=train_loader,
             val_loader=val_loader,
-            output_path=vit_path,
+            output_path=model_out_path,
             epochs=epochs,
             lr=lr,
+            patience=patience,
             device=device
         )
-        benchmark_results["vit"] = package_metrics("vit", vit_model)
+        benchmark_results[m_key] = package_metrics(m_key, trained_model)
 
-    # Save real benchmark metrics to JSON file
-    metrics_json_path = results_dir / "real_benchmark_metrics.json"
-    with open(metrics_json_path, "w", encoding="utf-8") as f:
-        json.dump(benchmark_results, f, indent=2)
+        # Save benchmark metrics incrementally after each model completes
+        with open(metrics_json_path, "w", encoding="utf-8") as f:
+            json.dump(benchmark_results, f, indent=2)
+        logger.info(f"Updated benchmark results for {m_key} in: {metrics_json_path}")
 
-    logger.info(f"Exported empirical benchmark metrics to: {metrics_json_path}")
-    logger.info("All CNN, Hybrid, and ViT models trained and evaluated successfully!")
+    logger.info(f"Benchmark training complete! Exported metrics to: {metrics_json_path}")
 
 
 if __name__ == "__main__":
-    run_pipeline()
+    parser = argparse.ArgumentParser(description="NeuroGraph-ASD CNN/Hybrid Benchmark Training Pipeline")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="all",
+        choices=["all", "modstem_lstm", "resnet50", "densenet121", "efficientnet_b0", "mobilenet_v2", "vit"],
+        help="Specify architecture to train ('all' or single model name)"
+    )
+    parser.add_argument("--epochs", type=int, default=20, help="Training epochs (default: 20)")
+    parser.add_argument("--patience", type=int, default=5, help="Early stopping patience (default: 5)")
+    parser.add_argument("--batch-size", type=int, default=32, help="DataLoader batch size (default: 32)")
+    parser.add_argument("--lr", type=float, default=1e-4, help="Base learning rate (default: 1e-4)")
+    parser.add_argument("--data-dir", type=str, default="data/zenodo/extracted/ASD Data", help="Path to ASD dataset")
+    parser.add_argument("--models-dir", type=str, default="models", help="Output directory for .pth models")
+    parser.add_argument("--results-dir", type=str, default="results", help="Output directory for benchmark metrics JSON")
+    parser.add_argument("--skip-vit", action="store_true", help="Skip training ViT when running --model all")
+
+    args = parser.parse_args()
+
+    run_pipeline(
+        data_dir_str=args.data_dir,
+        models_dir_str=args.models_dir,
+        results_dir_str=args.results_dir,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        patience=args.patience,
+        model_choice=args.model,
+        train_vit=not args.skip_vit
+    )

@@ -309,7 +309,7 @@ export default function ImageUploader({
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '4px' }}>
               <span style={{ fontSize: '0.86rem', fontWeight: 700, color: (selectedModelType === 'Mod-Stem ResNet-50 + LSTM' || selectedModelType === 'modstem_lstm') ? '#ffffff' : '#cbd5e1' }}>
-                MOD-STEM RESNET-50 + LSTM
+                MOD-STEM RESNET-50 + SPATIAL BI-LSTM
               </span>
               <span
                 style={{
@@ -326,10 +326,10 @@ export default function ImageUploader({
               </span>
             </div>
             <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-              3×3 Mod-Stem • Bi-LSTM • 25.8M Params
+              3×3 Mod-Stem • Spatial Bi-LSTM • 25.8M Params
             </span>
             <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '3px' }}>
-              Preserves subtle pediatric facial geometry across vertical anatomical slices
+              Preserves subtle pediatric facial geometry across vertical spatial slices
             </span>
           </button>
 
